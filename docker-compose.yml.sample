@@ -135,7 +135,7 @@ services:
     command: daemon
     container_name: cross-seed
     depends_on:
-      - qbittorrent
+      - qbittorrent-wg
       - prowlarr
     environment:
       - TZ=${TZ}
@@ -161,8 +161,6 @@ services:
     environment:
       - POST=0
       - CONTAINERS=1
-      #- IMAGES=1
-      #- EXEC=1
     image: ghcr.io/tecnativa/docker-socket-proxy
     labels:
       - "org.hotio.pullio.notify=true"
@@ -236,7 +234,6 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-#    image: filebrowser/filebrowser:s6
     image: filebrowser/filebrowser
     labels:
       - "org.hotio.pullio.notify=true"
@@ -349,7 +346,6 @@ services:
       - /dev/nvme0n1:/dev/nvme0n1
       - /dev/nvme1n1:/dev/nvme1n1
       - /dev/nvme2n1:/dev/nvme2n1
-      - /dev/nvme3n1:/dev/nvme3n1
     environment:
       - TZ=${TZ}
     hostname: davo1624
@@ -417,7 +413,6 @@ services:
       - misc
     volumes:
       - ${CONF_PATH}/orpheusbetter:/config/.orpheusbetter
-      #- ${CONF_PATH}/tmp:/config/.orpheusbetter
       - ${DATA_PATH}/torrents:/data/torrents
   overseerr:
     <<: *base-mem
@@ -471,12 +466,46 @@ services:
       - media
     ports:
       - 32400:32400
+      - 1900:1900/udp #DLNA
+      - 32410:32410/udp #GDM network
+      - 32412-32414:32412-32414/udp #GDM network
+      - 32469:32469 #DLNA
     restart: unless-stopped
     #runtime: nvidia
     volumes:
       - ${MEDIA_PATH}:/data/media
       - ${CONF_PATH}/plex:/config
       - /tmp/plex:/transcode
+  plex-cleanup:
+    <<: *base-mem
+    container_name: pcu
+    environment:
+      - TZ=${TZ}
+      - PLEX_PATH=/plex-appdata
+      - MODE=remove
+      - PLEX_URL=http://plex:32400
+      - PLEX_TOKEN=S6LAYZrc5TVzMR_bRLL9
+      - PHOTO_TRANSCODER=true
+      - EMPTY_TRASH=true
+      - CLEAN_BUNDLES=true
+      - OPTIMIZE_DB=true
+      - DISCORD=https://discord.com/api/webhooks/921455559637598299/Y9J-aJE9NXEx9AqsF42FdhxHPxQHfwt6y7MqRSi7meNu-K2YBD410no_qGPAghOkFKDB
+      - SLEEP=30
+      - SCHEDULE=02:45|daily
+    image: meisnate12/plex-image-cleanup
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/meisnate12/Plex-Image-Cleanup/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
+    networks:
+      - media
+    user: ${PUID}:${PGID}
+    volumes:
+      - ${CONF_PATH}/pcu:/config
+      - ${CONF_PATH}/plex:/plex-appdata
   plex-meta-manager:
     <<: *base-mem
     container_name: pmm
@@ -484,8 +513,6 @@ services:
       - PMM_TIME=02:00
       - PMM_DIVIDER==
       - PMM_WIDTH=200
-      #- PUID=${PUID}
-      #- PGID=${PGID}
       - TZ=${TZ}
     image: meisnate12/plex-meta-manager:nightly
     labels:
@@ -501,7 +528,6 @@ services:
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pmm:/config
-      #- ${CONF_PATH}/pmm/defaults:/defaults
   plextraktsync:
     <<: *base-mem
     container_name: plextraktsync
@@ -521,7 +547,7 @@ services:
     container_name: portainer
     environment:
       - VIRTUAL_PORT=9000
-      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - VIRTUAL_HOST=portainer.${DOMAIN}
       - PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
     image: portainer/portainer-ce:latest
     labels:
@@ -534,6 +560,9 @@ services:
     mac_address: "02:42:ac:11:00:06"
     networks:
       - misc
+    #ports:
+      #- 9443:9443
+      #- 9000:9000
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -585,7 +614,7 @@ services:
     restart: "no"
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose'
+    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose'
   prowlarr:
     <<: *base-mem
     container_name: prowlarr
@@ -597,7 +626,6 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    #image: cr.hotio.dev/hotio/prowlarr:nightly-0.4.8.2076
     image: cr.hotio.dev/hotio/prowlarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
@@ -865,7 +893,6 @@ services:
     networks:
       - misc
     volumes:
-      #- ${CONF_PATH}/restic:/config
       - ${BACKUP_PATH}:/data
     restart: unless-stopped
   sabnzbd:
@@ -876,7 +903,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/sabnzbd:nightly
+    image: cr.hotio.dev/hotio/sabnzbd:testing
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -890,42 +917,6 @@ services:
     restart: unless-stopped
     volumes:
       - ${CONF_PATH}/sabnzbd:/config
-      - ${DATA_PATH}:/data
-  slskd:
-    <<: *base-mem
-    container_name: slskd
-    environment:
-      - SLSKD_DOWNLOADS_DIR=/data/soulseek
-      - SLSKD_INCOMPLETE_DIR=/data/soulseek/.incomplete
-      - SLSKD_SHARED_DIR=/data/media/music;/data/media/music-unsorted
-      - SLSKD_UPLOAD_SLOTS=3
-      - SLSKD_SLSK_USERNAME=${SLSK_USERNAME}
-      - SLSKD_SLSK_PASSWORD=${SLSK_PASSWORD}
-      - SLSKD_SLSK_LISTEN_PORT=12800
-      - SLSKD_HTTP_PORT=5000
-      - SLSKD_NO_AUTH=true
-      - SLSKD_REMOTE_CONFIGURATION=true
-      - SLSKD_SLSK_NO_DNET=false
-      - SLSKD_SLSK_DNET_NO_CHILDREN=false
-      - SLSKD_SLSK_DNET_CHILDREN=50
-      - "SLSKD_SLSK_DESCRIPTION=slskd https://github.com/slskd/slskd"
-    image: slskd/slskd:latest
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/slskd/slskd/releases\", \"label\": \"changelog\"}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/HGzzQZ5/soulseek.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/HGzzQZ5/soulseek.png"
-    networks:
-      - wg2
-    ports:
-      - 5001:5001
-      - 12800:12800
-    restart: unless-stopped
-    user: ${PUID}:${PGID}
-    volumes:
-      - ${CONF_PATH}/slskd:/app
       - ${DATA_PATH}:/data
   sonarr:
     <<: *base-mem
@@ -1008,28 +999,31 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - VIRTUAL_HOST=${VIRTUAL_HOST}
-      - VIRTUAL_PORT=${VIRTUAL_PORT}
-      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
-      - LETSENCRYPT_EMAIL=${CF_USER}
+      - TZ=${TZ}
+      #- VIRTUAL_HOST=syncthing.${DOMAIN}
+      #- VIRTUAL_PORT=${VIRTUAL_PORT}
+      #- LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      #- LETSENCRYPT_EMAIL=${CF_USER}
     hostname: ${HOSTNAME}
-    image: syncthing/syncthing
+    image: lscr.io/linuxserver/syncthing:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
       - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
       - "org.hotio.pullio.author.avatar=https://i.ibb.co/cFYKs9f/png-transparent-syncthing-computer-icons-android-file-synchronization-linux-android-linux-android-sy.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/syncthing/syncthing/releases\", \"label\": \"changelog\"}"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-syncthing/releases\", \"label\": \"changelog\"}"
       - "net.unraid.docker.icon=https://i.ibb.co/cFYKs9f/png-transparent-syncthing-computer-icons-android-file-synchronization-linux-android-linux-android-sy.png"
     networks:
       - misc
     ports:
-      #- 8384:8384 # Web UI
-      - 22000:22000
+      - 8384:8384 # Web UI
+      - 22000:22000/tcp
+      - 22000:22000/udp
       - 21027:21027/udp # Receive local discovery broadcasts
     restart: unless-stopped
     volumes:
-      - /mnt/user/data/syncthing:/var/syncthing
+      - ${CONF_PATH}/syncthing:/config
+      - ${DATA_PATH}/syncthing:/data/syncthing
   tautulli:
     <<: *base-mem
     container_name: tautulli
