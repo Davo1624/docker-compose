@@ -484,7 +484,7 @@ services:
       - PLEX_PATH=/plex-appdata
       - MODE=remove
       - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=S6LAYZrc5TVzMR_bRLL9
+      - PLEX_TOKEN=cool-token
       - PHOTO_TRANSCODER=true
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
