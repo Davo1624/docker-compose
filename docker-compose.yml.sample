@@ -489,7 +489,7 @@ services:
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/<webhook>
+      - DISCORD=https://discord.com/api/webhooks/cool-url
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
