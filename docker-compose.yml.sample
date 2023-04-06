@@ -226,6 +226,7 @@ services:
       - ${CONF_PATH}/overseerr/logs:/remotelogs/overseerr:ro
       - ${CONF_PATH}/swag/log/nginx:/remotelogs/nginx:ro
       - ${CONF_PATH}/filebrowser/log:/remotelogs/filebrowser:ro
+      - ${CONF_PATH}/immich/log/nginx:/remotelogs/immich:ro
       - /var/log:/remotelogs/unraid:ro
   filebrowser:
     <<: *base-mem
@@ -277,6 +278,48 @@ services:
     restart: unless-stopped
     volumes:
       - ${CONF_PATH}/firefox-syncserver:/data
+  immich:
+    <<: *base-logging
+    container_name: immich
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - DB_HOSTNAME=${POSTGRES_HOST}
+      - DB_USERNAME=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_DATABASE_NAME=immich
+      - DB_PORT=5432 #optional
+      - REDIS_HOSTNAME=${REDIS_HOST}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_PORT=6379 #optional
+      #- REDIS_PASSWORD= #optional
+    image: ghcr.io/imagegenius/immich:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/myBS6Q2/immich.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/imagegenius/docker-immich/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/myBS6Q2/immich.png"
+    networks:
+      - misc
+    #ports:
+      #- 8085:8080
+    restart: unless-stopped
+    volumes:
+      - ${CONF_PATH}/immich:/config
+      - ${CONF_PATH}/immich/thumbs:/photos/thumbs
+      - ${CONF_PATH}/immich/encoded-video:/photos/encoded-video
+      - ${CONF_PATH}/immich/profile:/photos/profile
+      - ${DATA_PATH}/immich:/photos
+      - ${DATA_PATH}/immich/upload:/upload
+      - ${DATA_PATH}/immich/uploads:/uploads
   lidarr:
     <<: *base-mem
     container_name: lidarr
@@ -382,7 +425,7 @@ services:
       - PGID=${PGID}
       - PUID=${PUID}
       - TZ=${TZ}
-    image: ghcr.io/autobrr/omegabrr:latest
+    image: ghcr.io/autobrr/omegabrr:main
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -484,12 +527,12 @@ services:
       - PLEX_PATH=/plex-appdata
       - MODE=remove
       - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=cool-token
+      - PLEX_TOKEN=S6LAYZrc5TVzMR_bRLL9
       - PHOTO_TRANSCODER=true
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/cool-url
+      - DISCORD=https://discord.com/api/webhooks/921455559637598299/Y9J-aJE9NXEx9AqsF42FdhxHPxQHfwt6y7MqRSi7meNu-K2YBD410no_qGPAghOkFKDB
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -502,6 +545,7 @@ services:
       - "net.unraid.docker.icon=https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
     networks:
       - media
+    restart: unless-stopped
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pcu:/config
@@ -581,11 +625,11 @@ services:
       retries: 3
     image: postgres:14-alpine
     labels:
-      #- "org.hotio.pullio.notify=true"
-      #- "org.hotio.pullio.update=true"
-      #- "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      #- "org.hotio.pullio.author.avatar=https://i.ibb.co/NCgNfC8/pgadmin.png"
-      #- "org.hotio.pullio.author.url={\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/NCgNfC8/pgadmin.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
       - "net.unraid.docker.icon=https://i.ibb.co/NCgNfC8/pgadmin.png"
     networks:
       - misc
@@ -607,7 +651,7 @@ services:
       - "org.hotio.pullio.update=true"
       - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
       - "org.hotio.pullio.author.avatar=https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
-      #- "org.hotio.pullio.author.url={\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
       - "net.unraid.docker.icon=https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
     networks:
       - media
@@ -679,50 +723,6 @@ services:
       - "net.unraid.docker.icon=https://i.ibb.co/QHtmzYY/qbittools.png"
     networks:
       - media
-  qbittorrent-race:
-    <<: *base-logging
-    cap_add:
-      - NET_ADMIN
-    container_name: qbittorrent-race
-    dns:
-      - 9.9.9.9
-      - 1.1.1.1
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=002
-      - TZ=${TZ}
-      - VPN_ENABLED=true
-      - VPN_LAN_NETWORK=192.168.0.0/18
-      - VPN_CONF=wg0
-      - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=false
-      - WEBUI_PORTS=8082/tcp,8082/udp
-      #- VPN_IP_CHECK_EXIT=false
-    healthcheck:
-      test: curl --fail https://icanhazip.com || exit 1
-      interval: 60s
-      retries: 5
-      start_period: 20s
-      timeout: 10s
-    image: cr.hotio.dev/hotio/qbittorrent:release-4.4.5
-    labels:
-      #- "org.hotio.pullio.notify=true"
-      #- "org.hotio.pullio.update=false"
-      #- "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      #- "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    networks:
-      - media
-    #ports:
-      #- 8082:8082
-    restart: unless-stopped
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv6.conf.all.disable_ipv6=1
-    volumes:
-      - ${CONF_PATH}/qbittorrent-race:/config
-      - /mnt/disks/race:/race
   qbittorrent-wg:
     <<: *base-logging
     cap_add:
@@ -767,7 +767,6 @@ services:
     volumes:
       - ${CONF_PATH}/qbittorrent-wg:/config
       - ${DATA_PATH}/torrents:/data/torrents
-      - /mnt/disks/rescue:/rescue
   radarr:
     <<: *base-mem
     container_name: radarr
@@ -993,37 +992,6 @@ services:
     volumes:
       - ${CONF_PATH}/swag:/config
       - ${CONF_PATH}/swag/config/log/debug:/var/log/letsencrypt
-  syncthing:
-    <<: *base-mem
-    container_name: syncthing
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      #- VIRTUAL_HOST=syncthing.${DOMAIN}
-      #- VIRTUAL_PORT=${VIRTUAL_PORT}
-      #- LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
-      #- LETSENCRYPT_EMAIL=${CF_USER}
-    hostname: ${HOSTNAME}
-    image: lscr.io/linuxserver/syncthing:latest
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/cFYKs9f/png-transparent-syncthing-computer-icons-android-file-synchronization-linux-android-linux-android-sy.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-syncthing/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/cFYKs9f/png-transparent-syncthing-computer-icons-android-file-synchronization-linux-android-linux-android-sy.png"
-    networks:
-      - misc
-    ports:
-      - 8384:8384 # Web UI
-      - 22000:22000/tcp
-      - 22000:22000/udp
-      - 21027:21027/udp # Receive local discovery broadcasts
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/syncthing:/config
-      - ${DATA_PATH}/syncthing:/data/syncthing
   tautulli:
     <<: *base-mem
     container_name: tautulli
