@@ -46,8 +46,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-#    image: ghcr.io/autobrr/autobrr:develop
-    image: ghcr.io/autobrr/autobrr:pr-932
+    image: ghcr.io/autobrr/autobrr:develop
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -118,7 +117,7 @@ services:
     environment:
       - DOCKER_HOST=tcp://dockerproxy:2375
       - CONTAINERMON_CHECK_STOPPED=false
-      - CONTAINERMON_NOTIFICATION_URL=discord://[redacted]
+      - CONTAINERMON_NOTIFICATION_URL=discord://2rdq5o-_rpUtlm9bKdN6v98wCB7Lna5MDU2IYXyCmrBZ3MxBvC2AfF8hH3H6rutX2LRB@1040001664217796651
     image: ghcr.io/rafhaanshah/container-mon:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -140,9 +139,7 @@ services:
       - prowlarr
     environment:
       - TZ=${TZ}
-#    image: ghcr.io/baukezwart/cross-seed:version-4.4.4
-#    image: crossseed/cross-seed:master
-    image: crossseed/cross-seed:version-4.4.4
+    image: ghcr.io/baukezwart/cross-seed:master
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -253,6 +250,34 @@ services:
       - ${CONF_PATH}/filebrowser:/config
       - ${CONF_PATH}/filebrowser/filebrowser.db:/database/filebrowser.db
       - ${DATA_PATH}/filebrowser:/srv
+  firefox-syncserver:
+    <<: *base-mem
+    container_name: firefox-syncserver
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - FF_SYNCSERVER_PUBLIC_URL=https://firefox.${DOMAIN}
+      - FF_SYNCSERVER_SECRET=${FF_SYNCSERVER_SECRET}
+      - FF_SYNCSERVER_FORWARDED_ALLOW_IPS=*
+      - FF_SYNCSERVER_FORCE_WSGI_ENVIRON=true
+      - FF_SYNCSERVER_LOGLEVEL=debug
+      - FF_SYNCSERVER_ALLOW_NEW_USERS=true
+    image: crazymax/firefox-syncserver:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/XsFT7Mr/1920px-Firefox-logo-2019-svg.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/crazy-max/docker-firefox-syncserver/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/XsFT7Mr/1920px-Firefox-logo-2019-svg.png"
+    networks:
+      - misc
+   #ports: 
+     #- 5000:5000/tcp
+    restart: unless-stopped
+    volumes:
+      - ${CONF_PATH}/firefox-syncserver:/data
   immich:
     <<: *base-logging
     container_name: immich
@@ -337,70 +362,6 @@ services:
     restart: unless-stopped
     volumes:
       - ${CONF_PATH}/linkding:/etc/linkding/data
-  mealie-api:
-    <<: *base-mem
-    container_name: mealie-api
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
-      - ALLOW_SIGNUP=false
-      - API_PORT=9000
-      - BASE_URL=https://mealie.${DOMAIN}
-      - DEFAULT_EMAIL=${EMAIL}
-      - DB_ENGINE=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_SERVER=${POSTGRES_HOST}
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=mealie
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_FROM_NAME=Mealie
-      - SMTP_AUTH_STRATEGY=${SMTP_AUTH_STRATEGY}
-      - SMTP_FROM_EMAIL=${EMAIL}
-      - SMTP_USER=${EMAIL}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-    image: hkotel/mealie:api-nightly
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3sfdp72/mealie.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/hay-kot/mealie/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3sfdp72/mealie.png"
-    networks:
-      - misc
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/mealie:/app/data
-  mealie-frontend:
-    <<: *base-mem
-    container_name: mealie
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - API_URL=http://mealie-api:9000
-    image: hkotel/mealie:frontend-nightly
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3sfdp72/mealie.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/hay-kot/mealie/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3sfdp72/mealie.png"
-    networks:
-      - misc
-    #ports:
-      #- 9925:3000
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/mealie:/app/data
   notifiarr:
     <<: *base-mem
     cap_add:
@@ -571,7 +532,7 @@ services:
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/[redacted]
+      - DISCORD=https://discord.com/api/webhooks/921455559637598299/Y9J-aJE9NXEx9AqsF42FdhxHPxQHfwt6y7MqRSi7meNu-K2YBD410no_qGPAghOkFKDB
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -662,7 +623,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-    image: postgres:14
+    image: postgres:14-alpine
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=false"
@@ -1094,7 +1055,7 @@ services:
       - SIGNUPS_VERIFY=true
       - INVITATIONS_ALLOWED=true
       - ADMIN_TOKEN=${ADMIN_TOKEN}
-      - "DATABASE_URL=postgresql://postgres:[redacted]@postgres:5432/vaultwarden"
+      - "DATABASE_URL=postgresql://postgres:docker@postgres:5432/vaultwarden"
     image: vaultwarden/server:latest
     labels:
       - "org.hotio.pullio.notify=true"
