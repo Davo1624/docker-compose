@@ -46,8 +46,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-#    image: ghcr.io/autobrr/autobrr:develop
-    image: ghcr.io/autobrr/autobrr:pr-932
+    image: ghcr.io/autobrr/autobrr:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -63,6 +62,91 @@ services:
     volumes:
       - ${CONF_PATH}/autobrr:/config
       - ${CONF_PATH}/autobrr/definitions:/definitions
+  barassistant:
+    <<: *base-mem
+    container_name: barassistant
+    depends_on:
+      - barassistant-meilisearch
+      - redis
+    environment:
+      - APP_URL=https://bar.${DOMAIN}/bar
+      - LOG_CHANNEL=stderr
+      - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
+      - MEILISEARCH_HOST=http://barassistant-meilisearch:7700
+      - REDIS_HOST=redis
+      - ALLOW_REGISTRATION=true
+    image: barassistant/server:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/karlomikus/bar-assistant/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+    networks:
+      - misc
+    restart: unless-stopped
+    #user: ${PUID}:${PGID}
+    volumes:
+      - ${CONF_PATH}/barassistant:/var/www/cocktails/storage/bar-assistant
+  barassistant-meilisearch:
+    container_name: barassistant-meilisearch
+    <<: *base-mem
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - MEILI_ENV=production
+    image: getmeili/meilisearch:v1.1
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/qpnDpxG/meilisearch.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/qpnDpxG/meilisearch.png"
+    networks:
+      - misc
+    restart: unless-stopped
+    #user: ${PUID}:${PGID}
+    volumes:
+      - ${CONF_PATH}/barassistant/meili:/meili_data
+  barassistant-saltrim:
+    <<: *base-mem
+    container_name: barassistant-saltrim
+    depends_on:
+      - barassistant
+    environment:
+      - API_URL=https://bar.${DOMAIN}/bar
+      - MEILISEARCH_URL=https://bar.${DOMAIN}/search
+      - "BAR_NAME=Stauffer House"
+      - "DESCRIPTION=It's 5:00 somewhere!!"
+    image: barassistant/salt-rim:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/karlomikus/vue-salt-rim/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+    networks:
+      - misc
+    restart: unless-stopped
+  barassistant-webserver:
+    container_name: barassistant-webserver
+    image: nginx:alpine
+    labels:
+      - "org.hotio.pullio.notify=false"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/tbfjz1q/db-backup.png"
+      #- "org.hotio.pullio.author.url={\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/tbfjz1q/db-backup.png"
+    networks:
+      - misc
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    volumes:
+      - ${CONF_PATH}/barassistant/webserver/nginx.conf:/etc/nginx/conf.d/default.conf
   bazarr:
     <<: *base-mem
     container_name: bazarr
@@ -118,7 +202,7 @@ services:
     environment:
       - DOCKER_HOST=tcp://dockerproxy:2375
       - CONTAINERMON_CHECK_STOPPED=false
-      - CONTAINERMON_NOTIFICATION_URL=discord://[redacted]
+      - CONTAINERMON_NOTIFICATION_URL=
     image: ghcr.io/rafhaanshah/container-mon:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -140,9 +224,7 @@ services:
       - prowlarr
     environment:
       - TZ=${TZ}
-#    image: ghcr.io/baukezwart/cross-seed:version-4.4.4
-#    image: crossseed/cross-seed:master
-    image: crossseed/cross-seed:version-4.4.4
+    image: ghcr.io/baukezwart/cross-seed:test
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -156,7 +238,7 @@ services:
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/cross-seed:/config
-      - ${DATA_PATH}/torrents:/data/torrents
+      - ${DATA_PATH}:/data
       - ${CONF_PATH}/qbittorrent-wg/data/BT_backup:/input
   dockerproxy:
     <<: *base-mem
@@ -209,6 +291,7 @@ services:
       - DISC_ME=${DISC_ME}
       - DISC_API=${DISC_API}
       #- MAXMINDDB_LICENSE_KEY=${MAXMINDDB_KEY}
+      - VERBOSITY=-vv
     image: lscr.io/linuxserver/fail2ban:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -566,12 +649,12 @@ services:
       - PLEX_PATH=/plex-appdata
       - MODE=remove
       - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=S6LAYZrc5TVzMR_bRLL9
+      - PLEX_TOKEN=
       - PHOTO_TRANSCODER=true
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/[redacted]
+      - DISCORD=https://discord.com/api/webhooks/1097534004049219595/OSJ11jRT20skfn0t8rfIU1ntz0bdfhglC4M8X4HUjQoPYttTl1IG9GE_KjWV50UBvlGj
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -734,6 +817,7 @@ services:
       - TZ=${TZ}
       - UMASK=002
     image: cr.hotio.dev/hotio/qbitmanage:nightly
+    #image: cr.hotio.dev/hotio/qbitmanage:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -776,7 +860,7 @@ services:
       - UMASK=002
       - TZ=${TZ}
       - VPN_ENABLED=true
-      - VPN_LAN_NETWORK=192.168.1.0/24
+      - VPN_LAN_NETWORK=192.168.30.0/24
       - VPN_CONF=wg0
       - VPN_ADDITIONAL_PORTS=
       - PRIVOXY_ENABLED=true
@@ -789,10 +873,10 @@ services:
       timeout: 10s
     image: cr.hotio.dev/hotio/qbittorrent:release-4.4.5
     labels:
-      #- "org.hotio.pullio.notify=true"
-      #- "org.hotio.pullio.update=false"
-      #- "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      #- "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      - "org.hotio.pullio.notify=false"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
     networks:
       - media
@@ -964,7 +1048,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-#    image: cr.hotio.dev/hotio/sonarr:v4
+    #image: cr.hotio.dev/hotio/sonarr:v4
     image: cr.hotio.dev/hotio/radarr:sonarr
     labels:
       - "org.hotio.pullio.notify=true"
@@ -1073,6 +1157,20 @@ services:
     volumes:
       - ${CONF_PATH}/unpackerr:/config
       - ${DATA_PATH}:/data
+  upgraderr:
+    <<: *base-mem
+    container_name: upgraderr
+    image: ghcr.io/kylesanderson/upgraderr:main
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/tMLYkkb/upgraderr.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/KyleSanderson/upgraderr/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/tMLYkkb/upgraderr.png"
+    networks:
+      - media
+    restart: unless-stopped
   vaultwarden:
     <<: *base-mem
     container_name: bitwarden
@@ -1094,7 +1192,7 @@ services:
       - SIGNUPS_VERIFY=true
       - INVITATIONS_ALLOWED=true
       - ADMIN_TOKEN=${ADMIN_TOKEN}
-      - "DATABASE_URL=postgresql://postgres:[redacted]@postgres:5432/vaultwarden"
+      - "DATABASE_URL=postgresql://postgres:docker@postgres:5432/vaultwarden"
     image: vaultwarden/server:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -1106,7 +1204,7 @@ services:
     mac_address: "02:42:ac:11:00:05"
     networks:
       - misc
-   # ports:
+    #ports:
       #- 4743:80
     restart: always
     volumes:
