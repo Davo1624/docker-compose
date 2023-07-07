@@ -117,7 +117,7 @@ services:
     environment:
       - API_URL=https://bar.${DOMAIN}/bar
       - MEILISEARCH_URL=https://bar.${DOMAIN}/search
-      - "BAR_NAME=Stauffer House"
+      - "BAR_NAME=My House"
       - "DESCRIPTION=It's 5:00 somewhere!!"
     image: barassistant/salt-rim:latest
     labels:
@@ -202,7 +202,7 @@ services:
     environment:
       - DOCKER_HOST=tcp://dockerproxy:2375
       - CONTAINERMON_CHECK_STOPPED=false
-      - CONTAINERMON_NOTIFICATION_URL=
+      - CONTAINERMON_NOTIFICATION_URL=discord://2rdq5o-_rpUtlm9bKdN6v98wCB7Lna5MDU2IYXyCmrBZ3MxBvC2AfF8hH3H6rutX2LRB@1040001664217796651"
     image: ghcr.io/rafhaanshah/container-mon:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -224,7 +224,7 @@ services:
       - prowlarr
     environment:
       - TZ=${TZ}
-    image: ghcr.io/baukezwart/cross-seed:test
+    image: crossseed/cross-seed:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -379,7 +379,7 @@ services:
       - ${DATA_PATH}/immich/upload:/upload
       - ${DATA_PATH}/immich/uploads:/uploads
   lidarr:
-    <<: *base-mem
+    #<<: *base-mem
     container_name: lidarr
     depends_on:
       postgres:
@@ -601,6 +601,38 @@ services:
       - media
     volumes:
       - ${CONF_PATH}/overseerr:/config
+  pgbackups:
+    <<: *base-mem
+    container_name: pgbackups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - BACKUP_DIR:/backups
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_DB=authelia autobrr immich lidarr-main mealie prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=6
+      - HEALTHCHECK_PORT=8080
+    image: prodrigestivill/postgres-backup-local
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/XSmQBNC/database-postgres.jpg"
+      #- "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/XSmQBNC/database-postgres.jpg"
+    networks:
+      - media
+    restart: unless-stopped
+    user: postgres:postgres
+    volumes:
+      - /mnt/backups/appdata/postgres:/backups
+      - ${CONF_PATH}/pgbackups:/var/lib/postgresql/data
   plex:
     <<: *base-logging
     container_name: plex
@@ -649,12 +681,12 @@ services:
       - PLEX_PATH=/plex-appdata
       - MODE=remove
       - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=
+      - PLEX_TOKEN=${PLEX_TOKEN}
       - PHOTO_TRANSCODER=true
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=
+      - DISCORD=https://discord.com/api/webhooks/[api]
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -761,7 +793,6 @@ services:
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/postgres:/var/lib/postgresql/data
-      - /mnt/disks/backup/db:/backup
   powershell:
     container_name: powershell
     environment:
@@ -780,7 +811,7 @@ services:
     restart: "no"
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose'
+    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose'
   prowlarr:
     <<: *base-mem
     container_name: prowlarr
@@ -1209,6 +1240,36 @@ services:
     restart: always
     volumes:
       - ${CONF_PATH}/vaultwarden:/data
+  webtop:
+    <<: *base-logging
+    container_name: webtop
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - SUBFOLDER=/
+      - TITLE=Webtop
+    image: lscr.io/linuxserver/webtop:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/N7f1CRT/webtop.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/N7f1CRT/webtop.png"
+    networks:
+      - misc
+    #ports:
+      #- 3000:3000
+      #- 3001:3001
+    restart: unless-stopped
+    shm_size: "1gb"
+    volumes:
+      - ${CONF_PATH}/webtop:/config
+      - ${DATA_PATH}:/data
+      #- /var/run/docker.sock:/var/run/docker.sock #optional
 networks:
   media:
     external: true
