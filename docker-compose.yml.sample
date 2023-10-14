@@ -14,7 +14,7 @@ x-base-logging: &base-logging
       max-size: ${DOCKERLOGGING_MAXSIZE}
 services:
   authelia:
-    <<: *base-mem
+    <<: *base-logging
     container_name: authelia
     depends_on:
       postgres:
@@ -37,7 +37,7 @@ services:
     volumes:
       - ${CONF_PATH}/authelia:/config
   autobrr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: autobrr
     depends_on:
       postgres:
@@ -45,7 +45,7 @@ services:
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
-      - TZ=${TZ}
+      - TZ=UTC
     image: ghcr.io/autobrr/autobrr:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -63,7 +63,7 @@ services:
       - ${CONF_PATH}/autobrr:/config
       - ${CONF_PATH}/autobrr/definitions:/definitions
   barassistant:
-    <<: *base-mem
+    <<: *base-logging
     container_name: barassistant
     depends_on:
       - barassistant-meilisearch
@@ -91,7 +91,7 @@ services:
       - ${CONF_PATH}/barassistant:/var/www/cocktails/storage/bar-assistant
   barassistant-meilisearch:
     container_name: barassistant-meilisearch
-    <<: *base-mem
+    <<: *base-logging
     environment:
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
       - MEILI_ENV=production
@@ -110,14 +110,14 @@ services:
     volumes:
       - ${CONF_PATH}/barassistant/meili:/meili_data
   barassistant-saltrim:
-    <<: *base-mem
+    <<: *base-logging
     container_name: barassistant-saltrim
     depends_on:
       - barassistant
     environment:
       - API_URL=https://bar.${DOMAIN}/bar
       - MEILISEARCH_URL=https://bar.${DOMAIN}/search
-      - "BAR_NAME=My House"
+      - "BAR_NAME=Bar House"
       - "DESCRIPTION=It's 5:00 somewhere!!"
     image: barassistant/salt-rim:latest
     labels:
@@ -148,14 +148,14 @@ services:
     volumes:
       - ${CONF_PATH}/barassistant/webserver/nginx.conf:/etc/nginx/conf.d/default.conf
   bazarr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: bazarr
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/bazarr:nightly
+    image: ghcr.io/hotio/bazarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -170,7 +170,7 @@ services:
       - ${CONF_PATH}/bazarr:/config
       - ${MEDIA_PATH}/:/data/media
   calibre:
-    <<: *base-mem
+    <<: *base-logging
     container_name: calibre
     environment:
       - PUID=${PUID}
@@ -200,9 +200,10 @@ services:
     depends_on:
       - dockerproxy
     environment:
+      - DOCKER_API_VERSION=1.41
       - DOCKER_HOST=tcp://dockerproxy:2375
       - CONTAINERMON_CHECK_STOPPED=false
-      - CONTAINERMON_NOTIFICATION_URL=discord://2rdq5o-_rpUtlm9bKdN6v98wCB7Lna5MDU2IYXyCmrBZ3MxBvC2AfF8hH3H6rutX2LRB@1040001664217796651"
+      - CONTAINERMON_NOTIFICATION_URL=discord://url
     image: ghcr.io/rafhaanshah/container-mon:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -215,12 +216,12 @@ services:
       - misc
     restart: unless-stopped
     user: ${PUID}:${PGID}
-  cross-seed:
-    <<: *base-mem
+  cross-seed-movies:
+    <<: *base-logging
     command: daemon
-    container_name: cross-seed
+    container_name: cross-seed-movies
     depends_on:
-      - qbittorrent-wg
+      #- qbittorrent-wg
       - prowlarr
     environment:
       - TZ=${TZ}
@@ -237,11 +238,36 @@ services:
     restart: unless-stopped
     user: ${PUID}:${PGID}
     volumes:
-      - ${CONF_PATH}/cross-seed:/config
+      - ${CONF_PATH}/cross-seed-movies:/config
       - ${DATA_PATH}:/data
-      - ${CONF_PATH}/qbittorrent-wg/data/BT_backup:/input
+      - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
+  cross-seed-tv:
+    <<: *base-logging
+    command: daemon
+    container_name: cross-seed-tv
+    depends_on:
+      #- qbittorrent-wg
+      - prowlarr
+    environment:
+      - TZ=${TZ}
+    image: crossseed/cross-seed:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Ptyx6sC/crossseed.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/Ptyx6sC/crossseed.png"
+    networks:
+      - media
+    restart: unless-stopped
+    user: ${PUID}:${PGID}
+    volumes:
+      - ${CONF_PATH}/cross-seed-tv:/config
+      - ${DATA_PATH}:/data
+      - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
   dockerproxy:
-    <<: *base-mem
+    <<: *base-logging
     container_name: dockerproxy
     environment:
       - POST=0
@@ -259,7 +285,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
   dozzle:
-    <<: *base-mem
+    <<: *base-logging
     container_name: dozzle
     environment:
       - DOCKER_HOST=tcp://dockerproxy:2375
@@ -277,7 +303,7 @@ services:
     #volumes:
       #- /var/run/docker.sock:/var/run/docker.sock:ro
   fail2ban:
-    <<: *base-mem
+    <<: *base-logging
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -315,7 +341,7 @@ services:
       - ${CONF_PATH}/immich/log/nginx:/remotelogs/immich:ro
       - /var/log:/remotelogs/unraid:ro
   filebrowser:
-    <<: *base-mem
+    <<: *base-logging
     container_name: filebrowser
     environment:
       - PUID=${PUID}
@@ -335,7 +361,7 @@ services:
     volumes:
       - ${CONF_PATH}/filebrowser:/config
       - ${CONF_PATH}/filebrowser/filebrowser.db:/database/filebrowser.db
-      - ${DATA_PATH}/filebrowser:/srv
+      - ${DATA_PATH}/uploads/filebrowser:/srv
   immich:
     <<: *base-logging
     container_name: immich
@@ -379,7 +405,7 @@ services:
       - ${DATA_PATH}/immich/upload:/upload
       - ${DATA_PATH}/immich/uploads:/uploads
   lidarr:
-    #<<: *base-mem
+    <<: *base-logging
     container_name: lidarr
     depends_on:
       postgres:
@@ -389,7 +415,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/lidarr:nightly
+    image: ghcr.io/hotio/lidarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -402,90 +428,8 @@ services:
     volumes:
       - ${CONF_PATH}/lidarr:/config
       - ${DATA_PATH}:/data
-  linkding:
-    <<: *base-mem
-    container_name: linkding
-    image: sissbruecker/linkding:latest
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/myYkxqL/linkding.jpg"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/sissbruecker/linkding/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/myYkxqL/linkding.jpg"
-    networks:
-      - misc
-   #ports:
-     #- 9091:9090
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/linkding:/etc/linkding/data
-  mealie-api:
-    <<: *base-mem
-    container_name: mealie-api
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
-      - ALLOW_SIGNUP=false
-      - API_PORT=9000
-      - BASE_URL=https://mealie.${DOMAIN}
-      - DEFAULT_EMAIL=${EMAIL}
-      - DB_ENGINE=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_SERVER=${POSTGRES_HOST}
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=mealie
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_FROM_NAME=Mealie
-      - SMTP_AUTH_STRATEGY=${SMTP_AUTH_STRATEGY}
-      - SMTP_FROM_EMAIL=${EMAIL}
-      - SMTP_USER=${EMAIL}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-    image: hkotel/mealie:api-nightly
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3sfdp72/mealie.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/hay-kot/mealie/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3sfdp72/mealie.png"
-    networks:
-      - misc
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/mealie:/app/data
-  mealie-frontend:
-    <<: *base-mem
-    container_name: mealie
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - API_URL=http://mealie-api:9000
-    image: hkotel/mealie:frontend-nightly
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3sfdp72/mealie.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/hay-kot/mealie/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3sfdp72/mealie.png"
-    networks:
-      - misc
-    #ports:
-      #- 9925:3000
-    restart: unless-stopped
-    volumes:
-      - ${CONF_PATH}/mealie:/app/data
   notifiarr:
-    <<: *base-mem
+    <<: *base-logging
     cap_add:
       - SYS_RAWIO
       - SYS_ADMIN
@@ -541,7 +485,7 @@ services:
       - /var/run/utmp:/var/run/utmp
       - /mnt/user:/storage/1
   omegabrr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: omegabrr
     environment:
       - PGID=${PGID}
@@ -562,7 +506,7 @@ services:
     volumes:
       - ${CONF_PATH}/omegabrr:/config
   orpheusbetter:
-    <<: *base-mem
+    <<: *base-logging
     container_name: orpheusbetter
     environment:
       - PUID=${PUID}
@@ -580,14 +524,14 @@ services:
       - ${CONF_PATH}/orpheusbetter:/config/.orpheusbetter
       - ${DATA_PATH}/torrents:/data/torrents
   overseerr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: overseerr
     environment:
       - PGID=${PGID}
       - PUID=${PUID}
       - UMASK=002
       - TZ=${TZ}
-    image: cr.hotio.dev/hotio/overseerr:nightly
+    image: ghcr.io/hotio/overseerr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -602,7 +546,7 @@ services:
     volumes:
       - ${CONF_PATH}/overseerr:/config
   pgbackups:
-    <<: *base-mem
+    <<: *base-logging
     container_name: pgbackups
     depends_on:
       postgres:
@@ -610,7 +554,7 @@ services:
     environment:
       - BACKUP_DIR:/backups
       - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_DB=authelia autobrr immich lidarr-main mealie prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden
+      - POSTGRES_DB=authelia autobrr immich lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - SCHEDULE=@daily
@@ -642,16 +586,16 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - VERSION=docker
-     #- PLEX_CLAIM=${PLEX_CLAIM}
-      - ALLOWED_NETWORKS=${ALLOWED_NETWORKS}
-      - ADVERTISE_IP=${ADVERTISE_IP}
-      - PLEX_PASS=yes
+      #- VERSION=docker
+      #- PLEX_CLAIM_TOKEN=${PLEX_CLAIM}
+      - PLEX_NO_AUTH_NETWORKS=${ALLOWED_NETWORKS}
+      - PLEX_ADVERTISE_URL=${ADVERTISE_IP}
+      - PLEX_BETA_INSTALL=false
       - UMASK=002
       - DEBUG=no
       #- NVIDIA_VISIBLE_DEVICES=GPU-cb6c8b8e-2662-a4d2-6afd-a37a5bf5e0be
       #- NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-    image: cr.hotio.dev/hotio/plex:latest
+    image: ghcr.io/hotio/plex:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -672,9 +616,10 @@ services:
     volumes:
       - ${MEDIA_PATH}:/data/media
       - ${CONF_PATH}/plex:/config
+      - ${CONF_PATH}/plex/cont-init.d/99-plex-remove-codecs.sh:/etc/cont-init.d/99-plex-remove-codecs
       - /tmp/plex:/transcode
   plex-cleanup:
-    <<: *base-mem
+    <<: *base-logging
     container_name: pcu
     environment:
       - TZ=${TZ}
@@ -686,7 +631,7 @@ services:
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/[api]
+      - DISCORD=https://discord.com/api/webhooks/1097534004049219595/OSJ11jRT20skfn0t8rfIU1ntz0bdfhglC4M8X4HUjQoPYttTl1IG9GE_KjWV50UBvlGj
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -705,7 +650,7 @@ services:
       - ${CONF_PATH}/pcu:/config
       - ${CONF_PATH}/plex:/plex-appdata
   plex-meta-manager:
-    <<: *base-mem
+    <<: *base-logging
     container_name: pmm
     environment:
       - PMM_TIME=02:00
@@ -727,7 +672,7 @@ services:
     volumes:
       - ${CONF_PATH}/pmm:/config
   plextraktsync:
-    <<: *base-mem
+    <<: *base-logging
     container_name: plextraktsync
     image: ghcr.io/taxel/plextraktsync:latest
     labels:
@@ -741,7 +686,7 @@ services:
     volumes:
       - ${CONF_PATH}/plextraktsync:/app/config
   portainer:
-    <<: *base-mem
+    <<: *base-logging
     container_name: portainer
     environment:
       - VIRTUAL_PORT=9000
@@ -813,7 +758,7 @@ services:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
     command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose'
   prowlarr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: prowlarr
     depends_on:
       postgres:
@@ -823,7 +768,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/prowlarr:nightly
+    image: ghcr.io/hotio/prowlarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -836,7 +781,7 @@ services:
     volumes:
       - ${CONF_PATH}/prowlarr:/config
   qbit-manage:
-    <<: *base-mem
+    <<: *base-logging
     container_name: qbit-manage
     environment:
       - QBT_SCHEDULE=60
@@ -847,7 +792,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/qbitmanage:nightly
+    image: ghcr.io/hotio/qbitmanage:nightly
     #image: cr.hotio.dev/hotio/qbitmanage:latest
     labels:
       - "org.hotio.pullio.notify=true"
@@ -861,12 +806,12 @@ services:
     restart: unless-stopped
     volumes:
       - ${CONF_PATH}/qbm:/config
-      - ${CONF_PATH}/qbittorrent-wg/data/BT_backup:/torrents
+      - ${CONF_PATH}/qbit-misc/data/BT_backup:/torrents-misc
+      - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
+      - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
       - ${DATA_PATH}/torrents:/data/torrents
-      - /mnt/disks/race:/race
-      - /mnt/disks/rescue:/rescue
   qbit-tools:
-    <<: *base-mem
+    <<: *base-logging
     container_name: qbit-tools
     image: registry.gitlab.com/alexkm/qbittools:latest
     labels:
@@ -877,11 +822,11 @@ services:
       - "net.unraid.docker.icon=https://i.ibb.co/QHtmzYY/qbittools.png"
     networks:
       - media
-  qbittorrent-wg:
+  qbit-misc:
     <<: *base-logging
     cap_add:
       - NET_ADMIN
-    container_name: qbittorrent-wg
+    container_name: qbit-misc
     dns:
       - 9.9.9.9
       - 1.1.1.1
@@ -902,7 +847,7 @@ services:
       retries: 5
       start_period: 20s
       timeout: 10s
-    image: cr.hotio.dev/hotio/qbittorrent:release-4.4.5
+    image: docker.io/hotio/qbittorrent:release-4.5.4
     labels:
       - "org.hotio.pullio.notify=false"
       - "org.hotio.pullio.update=false"
@@ -919,10 +864,100 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv6.conf.all.disable_ipv6=1
     volumes:
-      - ${CONF_PATH}/qbittorrent-wg:/config
+      - ${CONF_PATH}/qbit-misc:/config
+      - ${DATA_PATH}/torrents:/data/torrents
+  qbit-movies:
+    <<: *base-logging
+    cap_add:
+      - NET_ADMIN
+    container_name: qbit-movies
+    dns:
+      - 9.9.9.9
+      - 1.1.1.1
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - VPN_ENABLED=true
+      - VPN_LAN_NETWORK=192.168.30.0/24
+      - VPN_CONF=wg0
+      - VPN_ADDITIONAL_PORTS=
+      - PRIVOXY_ENABLED=false
+      - WEBUI_PORTS=8083/tcp
+      #- VPN_IP_CHECK_EXIT=false
+    healthcheck:
+      test: curl --fail https://icanhazip.com || exit 1
+      interval: 60s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    image: docker.io/hotio/qbittorrent:release-4.5.4
+    labels:
+      - "org.hotio.pullio.notify=false"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+    networks:
+      - media
+    ports:
+      #- 8118:8118
+      - 8083:8083
+    restart: unless-stopped
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    volumes:
+      - ${CONF_PATH}/qbit-movies:/config
+      - ${DATA_PATH}/torrents:/data/torrents
+  qbit-tv:
+    <<: *base-logging
+    cap_add:
+      - NET_ADMIN
+    container_name: qbit-tv
+    dns:
+      - 9.9.9.9
+      - 1.1.1.1
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - UMASK=002
+      - TZ=${TZ}
+      - VPN_ENABLED=true
+      - VPN_LAN_NETWORK=192.168.30.0/24
+      - VPN_CONF=wg0
+      - VPN_ADDITIONAL_PORTS=
+      - PRIVOXY_ENABLED=false
+      - WEBUI_PORTS=8082/tcp
+      #- VPN_IP_CHECK_EXIT=false
+    healthcheck:
+      test: curl --fail https://icanhazip.com || exit 1
+      interval: 60s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    image: docker.io/hotio/qbittorrent:release-4.5.4
+    labels:
+      - "org.hotio.pullio.notify=false"
+      - "org.hotio.pullio.update=false"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+    networks:
+      - media
+    ports:
+      #- 8118:8118
+      - 8082:8082
+    restart: unless-stopped
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv6.conf.all.disable_ipv6=1
+    volumes:
+      - ${CONF_PATH}/qbit-tv:/config
       - ${DATA_PATH}/torrents:/data/torrents
   radarr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: radarr
     depends_on:
       postgres:
@@ -932,7 +967,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/radarr:nightly
+    image: ghcr.io/hotio/radarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -948,7 +983,7 @@ services:
       - ${CONF_PATH}/radarr:/config
       - ${DATA_PATH}:/data
   radarr-4k:
-    <<: *base-mem
+    <<: *base-logging
     container_name: radarr-4k
     depends_on:
       postgres:
@@ -959,7 +994,7 @@ services:
       - TZ=${TZ}
       - UMASK=002
       - TP_ADDON=radarr-4k-logo
-    image: cr.hotio.dev/hotio/radarr:v5
+    image: ghcr.io/hotio/radarr:zeus
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -975,7 +1010,7 @@ services:
       - ${CONF_PATH}/radarr-4k:/config
       - ${DATA_PATH}:/data
   readarr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: readarr
     depends_on:
       - calibre
@@ -985,7 +1020,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/readarr:nightly
+    image: ghcr.io/hotio/readarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -999,7 +1034,7 @@ services:
       - ${CONF_PATH}/readarr:/config
       - ${DATA_PATH}:/data
   redis:
-    <<: *base-mem
+    <<: *base-logging
     container_name: redis
     depends_on:
       postgres:
@@ -1023,7 +1058,7 @@ services:
     volumes:
       - ${CONF_PATH}/redis:/data
   restic:
-    <<: *base-mem
+    <<: *base-logging
     container_name: restic
     environment:
       - B2_ACCOUNT_ID=${B2_ACCOUNT_ID}
@@ -1049,14 +1084,14 @@ services:
       - ${BACKUP_PATH}:/data
     restart: unless-stopped
   sabnzbd:
-    <<: *base-mem
+    <<: *base-logging
     container_name: sabnzbd
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/sabnzbd:testing
+    image: ghcr.io/hotio/sabnzbd:testing
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -1072,15 +1107,14 @@ services:
       - ${CONF_PATH}/sabnzbd:/config
       - ${DATA_PATH}:/data
   sonarr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: sonarr
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    #image: cr.hotio.dev/hotio/sonarr:v4
-    image: cr.hotio.dev/hotio/radarr:sonarr
+    image: ghcr.io/hotio/sonarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -1095,8 +1129,32 @@ services:
     volumes:
       - ${CONF_PATH}/sonarr:/config
       - ${DATA_PATH}:/data
+  soulseek:
+    <<: *base-logging
+    container_name: soulseek
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    image: realies/soulseek:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/HGzzQZ5/soulseek.png"
+      - "net.unraid.docker.icon=https://i.ibb.co/HGzzQZ5/soulseek.png"
+    networks:
+      - wg2
+    ports:
+      - 6060:6080
+    restart: unless-stopped
+    volumes:
+      - ${CONF_PATH}/soulseek:/data/.SoulseekQt
+      - ${CONF_PATH}/soulseek/logs:/data/Soulseek Chat Logs
+      - ${DATA_PATH}/soulseek:/data/Soulseek Downloads
+      - ${DATA_PATH}/media:/media/Soulseek Shared Folder
   swag:
-    <<: *base-mem
+    <<: *base-logging
     cap_add:
       - NET_ADMIN
     container_name: swag
@@ -1147,14 +1205,14 @@ services:
       - ${CONF_PATH}/swag:/config
       - ${CONF_PATH}/swag/config/log/debug:/var/log/letsencrypt
   tautulli:
-    <<: *base-mem
+    <<: *base-logging
     container_name: tautulli
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
       - UMASK=002
-    image: cr.hotio.dev/hotio/tautulli:testing
+    image: ghcr.io/hotio/tautulli:testing
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -1168,11 +1226,11 @@ services:
     volumes:
       - ${CONF_PATH}/tautulli:/config
   unpackerr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: unpackerr
     environment:
       - UMASK=002
-    image: cr.hotio.dev/hotio/unpackerr:nightly
+    image: ghcr.io/hotio/unpackerr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -1189,7 +1247,7 @@ services:
       - ${CONF_PATH}/unpackerr:/config
       - ${DATA_PATH}:/data
   upgraderr:
-    <<: *base-mem
+    <<: *base-logging
     container_name: upgraderr
     image: ghcr.io/kylesanderson/upgraderr:main
     labels:
@@ -1203,7 +1261,7 @@ services:
       - media
     restart: unless-stopped
   vaultwarden:
-    <<: *base-mem
+    <<: *base-logging
     container_name: bitwarden
     depends_on:
       postgres:
@@ -1270,6 +1328,30 @@ services:
       - ${CONF_PATH}/webtop:/config
       - ${DATA_PATH}:/data
       #- /var/run/docker.sock:/var/run/docker.sock #optional
+  xbackbone:
+    <<: *base-logging
+    container_name: xbackbone
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    image: lscr.io/linuxserver/xbackbone:latest
+    labels:
+      - "org.hotio.pullio.notify=true"
+      - "org.hotio.pullio.update=true"
+      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+      - "org.hotio.pullio.author.avatar=https://i.ibb.co/M6L6KV3/xbackbone.png"
+      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-xbackbone/releases\", \"label\": \"changelog\"}"
+      - "net.unraid.docker.icon=https://i.ibb.co/M6L6KV3/xbackbone.png"
+    networks:
+      - misc
+    #ports:
+      #- 80:80
+      #- 443:443
+    restart: unless-stopped
+    volumes:
+      - ${CONF_PATH}/xbackbone:/config
+      - ${DATA_PATH}/uploads/xbackbone:/uploads
 networks:
   media:
     external: true
