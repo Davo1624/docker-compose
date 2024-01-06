@@ -86,7 +86,6 @@ services:
     networks:
       - misc
     restart: unless-stopped
-    #user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/barassistant:/var/www/cocktails/storage/bar-assistant
   barassistant-meilisearch:
@@ -106,7 +105,6 @@ services:
     networks:
       - misc
     restart: unless-stopped
-    #user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/barassistant/meili:/meili_data
   barassistant-saltrim:
@@ -117,7 +115,7 @@ services:
     environment:
       - API_URL=https://bar.${DOMAIN}/bar
       - MEILISEARCH_URL=https://bar.${DOMAIN}/search
-      - "BAR_NAME=Bar House"
+      - "BAR_NAME=My House"
       - "DESCRIPTION=It's 5:00 somewhere!!"
     image: barassistant/salt-rim:latest
     labels:
@@ -221,7 +219,7 @@ services:
     command: daemon
     container_name: cross-seed-movies
     depends_on:
-      #- qbittorrent-wg
+      - qbit-movies
       - prowlarr
     environment:
       - TZ=${TZ}
@@ -246,7 +244,7 @@ services:
     command: daemon
     container_name: cross-seed-tv
     depends_on:
-      #- qbittorrent-wg
+      - qbit-tv
       - prowlarr
     environment:
       - TZ=${TZ}
@@ -359,7 +357,7 @@ services:
       - misc
     restart: unless-stopped
     volumes:
-      - ${CONF_PATH}/filebrowser:/config
+      - ${CONF_PATH}/filebrowser/settings.json:/config/settings.json
       - ${CONF_PATH}/filebrowser/filebrowser.db:/database/filebrowser.db
       - ${DATA_PATH}/uploads/filebrowser:/srv
   immich:
@@ -378,12 +376,13 @@ services:
       - DB_USERNAME=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_DATABASE_NAME=immich
-      - DB_PORT=5432 #optional
+      - DB_PORT=5432
       - REDIS_HOSTNAME=${REDIS_HOST}
       - JWT_SECRET=${JWT_SECRET}
-      - REDIS_PORT=6379 #optional
-      #- REDIS_PASSWORD= #optional
-    image: ghcr.io/imagegenius/immich:latest
+      - REDIS_PORT=6379
+      #- REDIS_PASSWORD=
+    #image: ghcr.io/imagegenius/immich:latest
+    image: ghcr.io/imagegenius/immich:v1.90.2-ig224
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -590,7 +589,7 @@ services:
       #- PLEX_CLAIM_TOKEN=${PLEX_CLAIM}
       - PLEX_NO_AUTH_NETWORKS=${ALLOWED_NETWORKS}
       - PLEX_ADVERTISE_URL=${ADVERTISE_IP}
-      - PLEX_BETA_INSTALL=false
+      - PLEX_BETA_INSTALL=true
       - UMASK=002
       - DEBUG=no
       #- NVIDIA_VISIBLE_DEVICES=GPU-cb6c8b8e-2662-a4d2-6afd-a37a5bf5e0be
@@ -631,7 +630,7 @@ services:
       - EMPTY_TRASH=true
       - CLEAN_BUNDLES=true
       - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/1097534004049219595/OSJ11jRT20skfn0t8rfIU1ntz0bdfhglC4M8X4HUjQoPYttTl1IG9GE_KjWV50UBvlGj
+      - DISCORD=https://discord.com/api/webhooks/webhook
       - SLEEP=30
       - SCHEDULE=02:45|daily
     image: meisnate12/plex-image-cleanup
@@ -723,6 +722,7 @@ services:
       timeout: 5s
       retries: 3
     image: postgres:14
+    #image: pgautoupgrade/pgautoupgrade:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=false"
@@ -735,7 +735,7 @@ services:
       - media
     restart: unless-stopped
     shm_size: 1g
-    user: ${PUID}:${PGID}
+    #user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/postgres:/var/lib/postgresql/data
   powershell:
@@ -756,7 +756,7 @@ services:
     restart: "no"
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose'
+    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose'
   prowlarr:
     <<: *base-logging
     container_name: prowlarr
@@ -793,7 +793,6 @@ services:
       - TZ=${TZ}
       - UMASK=002
     image: ghcr.io/hotio/qbitmanage:nightly
-    #image: cr.hotio.dev/hotio/qbitmanage:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -810,40 +809,31 @@ services:
       - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
       - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
       - ${DATA_PATH}/torrents:/data/torrents
-  qbit-tools:
-    <<: *base-logging
-    container_name: qbit-tools
-    image: registry.gitlab.com/alexkm/qbittools:latest
-    labels:
-      - "org.hotio.pullio.notify=true"
-      - "org.hotio.pullio.update=true"
-      - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/QHtmzYY/qbittools.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/QHtmzYY/qbittools.png"
-    networks:
-      - media
   qbit-misc:
     <<: *base-logging
     cap_add:
       - NET_ADMIN
     container_name: qbit-misc
-    dns:
-      - 9.9.9.9
-      - 1.1.1.1
+    #dns:
+      #- 9.9.9.9
+      #- 1.1.1.1
+    depends_on:
+      qbit-movies:
+        condition: service_healthy
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - UMASK=002
       - TZ=${TZ}
-      - VPN_ENABLED=true
+      - VPN_ENABLED=false
       - VPN_LAN_NETWORK=192.168.30.0/24
       - VPN_CONF=wg0
       - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=true
+      - PRIVOXY_ENABLED=false
       #- VPN_IP_CHECK_EXIT=false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
-      interval: 60s
+      interval: 15s
       retries: 5
       start_period: 20s
       timeout: 10s
@@ -854,11 +844,12 @@ services:
       - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
       - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    networks:
-      - media
-    ports:
-      - 8118:8118
-      - 8080:8080
+    network_mode: container:qbit-movies
+    #networks:
+      #- media
+    #ports:
+      #- 8118:8118
+      #- 8080:8080
     restart: unless-stopped
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
@@ -883,12 +874,12 @@ services:
       - VPN_LAN_NETWORK=192.168.30.0/24
       - VPN_CONF=wg0
       - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=false
+      - PRIVOXY_ENABLED=true
       - WEBUI_PORTS=8083/tcp
       #- VPN_IP_CHECK_EXIT=false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
-      interval: 60s
+      interval: 15s
       retries: 5
       start_period: 20s
       timeout: 10s
@@ -902,8 +893,10 @@ services:
     networks:
       - media
     ports:
-      #- 8118:8118
+      - 8118:8118
       - 8083:8083
+      - 8082:8082
+      - 8080:8080
     restart: unless-stopped
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
@@ -916,15 +909,18 @@ services:
     cap_add:
       - NET_ADMIN
     container_name: qbit-tv
-    dns:
-      - 9.9.9.9
-      - 1.1.1.1
+    #dns:
+      #- 9.9.9.9
+      #- 1.1.1.1
+    depends_on:
+      qbit-movies:
+        condition: service_healthy
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - UMASK=002
       - TZ=${TZ}
-      - VPN_ENABLED=true
+      - VPN_ENABLED=false
       - VPN_LAN_NETWORK=192.168.30.0/24
       - VPN_CONF=wg0
       - VPN_ADDITIONAL_PORTS=
@@ -933,7 +929,7 @@ services:
       #- VPN_IP_CHECK_EXIT=false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
-      interval: 60s
+      interval: 15s
       retries: 5
       start_period: 20s
       timeout: 10s
@@ -944,11 +940,12 @@ services:
       - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
       - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    networks:
-      - media
-    ports:
+    #networks:
+      #- media
+    network_mode: container:qbit-movies
+    #ports:
       #- 8118:8118
-      - 8082:8082
+      #- 8082:8082
     restart: unless-stopped
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
@@ -994,7 +991,7 @@ services:
       - TZ=${TZ}
       - UMASK=002
       - TP_ADDON=radarr-4k-logo
-    image: ghcr.io/hotio/radarr:zeus
+    image: ghcr.io/hotio/radarr:nightly
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
@@ -1249,7 +1246,7 @@ services:
   upgraderr:
     <<: *base-logging
     container_name: upgraderr
-    image: ghcr.io/kylesanderson/upgraderr:main
+    image: ghcr.io/kylesanderson/upgraderr:latest
     labels:
       - "org.hotio.pullio.notify=true"
       - "org.hotio.pullio.update=true"
