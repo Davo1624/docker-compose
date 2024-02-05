@@ -1,25 +1,32 @@
-version: "3.3"
-x-base-mem: &base-mem
-  mem_limit: 4000m
-  logging:
-    driver: local
-    options:
-      max-file: ${DOCKERLOGGING_MAXFILE}
-      max-size: ${DOCKERLOGGING_MAXSIZE}
+version: "3.8"
 x-base-default: &base-default
   logging:
     driver: local
     options:
       max-file: ${DOCKERLOGGING_MAXFILE}
       max-size: ${DOCKERLOGGING_MAXSIZE}
-  labels:
-    - "org.hotio.pullio.notify=true"
-    - "org.hotio.pullio.update=true"
-    - "org.hotio.pullio.generic.webhook=${PULLIO_GENERIC_WEBHOOK}"
+  restart: unless-stopped
+x-base-media: &base-media
+  <<: *base-default
+  networks:
+    - media
+x-base-misc: &base-misc
+  <<: *base-default
+  networks:
+    - misc
+x-base-labels: &labels
+  org.hotio.pullio.notify: true
+  org.hotio.pullio.update: true
+  org.hotio.pullio.generic.webhook: ${PULLIO_GENERIC_WEBHOOK}
+x-base-env: &env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+  UMASK: 002
 
 services:
   authelia:
-    <<: *base-default
+    <<: *base-misc
     container_name: authelia
     depends_on:
       postgres:
@@ -27,245 +34,212 @@ services:
       redis:
         condition: service_healthy
     environment:
-      - TZ=${TZ}
+      - TZ: ${TZ}
     image: authelia/authelia:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/ZJ17rqR/59122411-s-200-v-4.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/authelia/authelia/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/ZJ17rqR/59122411-s-200-v-4.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/ZJ17rqR/59122411-s-200-v-4.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/authelia/authelia/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/ZJ17rqR/59122411-s-200-v-4.png"
     volumes:
       - ${CONF_PATH}/authelia:/config
   autobrr:
-    <<: *base-default
+    <<: *base-media
     container_name: autobrr
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=UTC
+      <<: *env
     image: ghcr.io/autobrr/autobrr:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Q9C23Cn/index.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/autobrr/autobrr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/Q9C23Cn/index.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Q9C23Cn/index.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/autobrr/autobrr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/Q9C23Cn/index.png"
     #ports:
       #- 8998:8989
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/autobrr:/config
       - ${CONF_PATH}/autobrr/definitions:/definitions
   barassistant:
-    <<: *base-default
+    <<: *base-misc
     container_name: barassistant
     depends_on:
       - barassistant-meilisearch
       - redis
     environment:
-      - APP_URL=https://bar.${DOMAIN}/bar
-      - LOG_CHANNEL=stderr
-      - MEILISEARCH_KEY=${MEILI_MASTER_KEY}
-      - MEILISEARCH_HOST=http://barassistant-meilisearch:7700
-      - REDIS_HOST=redis
-      - ALLOW_REGISTRATION=true
+      - APP_URL: https://bar.${DOMAIN}/bar
+      - LOG_CHANNEL: stderr
+      - MEILISEARCH_KEY: ${MEILI_MASTER_KEY}
+      - MEILISEARCH_HOST: "http://barassistant-meilisearch:7700"
+      - REDIS_HOST: redis
+      - ALLOW_REGISTRATION: true
     image: barassistant/server:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/karlomikus/bar-assistant/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/karlomikus/bar-assistant/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
     volumes:
       - ${CONF_PATH}/barassistant:/var/www/cocktails/storage/bar-assistant
   barassistant-meilisearch:
+    <<: *base-misc
     container_name: barassistant-meilisearch
-    <<: *base-default
     environment:
-      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
-      - MEILI_ENV=production
+      - MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      - MEILI_ENV: production
     image: getmeili/meilisearch:v1.1
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/qpnDpxG/meilisearch.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/qpnDpxG/meilisearch.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/qpnDpxG/meilisearch.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/qpnDpxG/meilisearch.png"
     volumes:
       - ${CONF_PATH}/barassistant/meili:/meili_data
   barassistant-saltrim:
-    <<: *base-default
+    <<: *base-misc
     container_name: barassistant-saltrim
     depends_on:
       - barassistant
     environment:
-      - API_URL=https://bar.${DOMAIN}/bar
-      - MEILISEARCH_URL=https://bar.${DOMAIN}/search
-      - "BAR_NAME=My House"
-      - "DESCRIPTION=It's 5:00 somewhere!!"
+      - API_URL: https://bar.${DOMAIN}/bar
+      - MEILISEARCH_URL: https://bar.${DOMAIN}/search
+      - BAR_NAME: "My House"
+      - DESCRIPTION: "It's 5:00 somewhere!!"
     image: barassistant/salt-rim:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/karlomikus/vue-salt-rim/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/karlomikus/vue-salt-rim/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/3rTrKtZ/bar-assistant.jpg"
   barassistant-webserver:
-    <<: *base-default
+    <<: *base-misc
     container_name: barassistant-webserver
     image: nginx:alpine
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/tbfjz1q/db-backup.png"
-      #- "org.hotio.pullio.author.url={\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/tbfjz1q/db-backup.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/tbfjz1q/db-backup.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://hub.docker.com/r/getmeili/meilisearch/tags\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/tbfjz1q/db-backup.png"
     ports:
       - 3000:3000
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/barassistant/webserver/nginx.conf:/etc/nginx/conf.d/default.conf
   bazarr:
-    <<: *base-default
+    <<: *base-media
     container_name: bazarr
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/bazarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/6gbNTWG/bazarr.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/morpheus65535/bazarr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/6gbNTWG/bazarr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/6gbNTWG/bazarr.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/morpheus65535/bazarr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/6gbNTWG/bazarr.png"
     volumes:
       - ${CONF_PATH}/bazarr:/config
       - ${MEDIA_PATH}/:/data/media
   calibre:
-    <<: *base-default
+    <<: *base-media
     container_name: calibre
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: lscr.io/linuxserver/calibre:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/vxtLww6/calibreweb.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/kovidgoyal/calibre/blob/master/Changelog.txt\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/vxtLww6/calibreweb.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/vxtLww6/calibreweb.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/kovidgoyal/calibre/blob/master/Changelog.txt\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/vxtLww6/calibreweb.png"
     ports:
       - 8081:8081
-    restart: unless-stopped
     security_opt:
-      - seccomp=unconfined
+      - seccomp: unconfined
     volumes:
       - ${CONF_PATH}/calibre:/config
       - ${DATA_PATH}:/data
   container-monitor:
-    <<: *base-default
+    <<: *base-misc
     container_name: container-monitor
     depends_on:
       - dockerproxy
     environment:
-      - DOCKER_API_VERSION=1.41
-      - DOCKER_HOST=tcp://dockerproxy:2375
-      - CONTAINERMON_CHECK_STOPPED=false
-      - CONTAINERMON_NOTIFICATION_URL=discord://url
+      - DOCKER_API_VERSION: "1.41"
+      - DOCKER_HOST: "tcp://dockerproxy:2375"
+      - CONTAINERMON_CHECK_STOPPED: false
+      - CONTAINERMON_NOTIFICATION_URL: "discord://url"
     image: ghcr.io/rafhaanshah/container-mon:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/K0bMT9W/docker-healthcheck.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/K0bMT9W/docker-healthcheck.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/K0bMT9W/docker-healthcheck.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/K0bMT9W/docker-healthcheck.png"
     user: ${PUID}:${PGID}
   cross-seed-movies:
-    <<: *base-default
+    <<: *base-media
     command: daemon
     container_name: cross-seed-movies
     depends_on:
       - qbit-movies
       - prowlarr
     environment:
-      - TZ=${TZ}
+      - TZ: ${TZ}
     image: crossseed/cross-seed:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Ptyx6sC/crossseed.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/Ptyx6sC/crossseed.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/Ptyx6sC/crossseed.png"
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/cross-seed-movies:/config
       - ${DATA_PATH}:/data
       - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
   cross-seed-tv:
-    <<: *base-default
+    <<: *base-media
     command: daemon
     container_name: cross-seed-tv
     depends_on:
       - qbit-tv
       - prowlarr
     environment:
-      - TZ=${TZ}
+      - TZ: ${TZ}
     image: crossseed/cross-seed:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Ptyx6sC/crossseed.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/Ptyx6sC/crossseed.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/Ptyx6sC/crossseed.png"
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/cross-seed-tv:/config
       - ${DATA_PATH}:/data
       - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
   dockerproxy:
-    <<: *base-default
+    <<: *base-misc
     container_name: dockerproxy
     environment:
-      - POST=0
-      - CONTAINERS=1
+      - POST: 0
+      - CONTAINERS: 1
     image: ghcr.io/tecnativa/docker-socket-proxy
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/WnBdBh0/docker-sock.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/Tecnativa/docker-socket-proxy/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/WnBdBh0/docker-sock.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/WnBdBh0/docker-sock.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/Tecnativa/docker-socket-proxy/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/WnBdBh0/docker-sock.png"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
   dozzle:
-    <<: *base-default
+    <<: *base-misc
     container_name: dozzle
     environment:
-      - DOCKER_HOST=tcp://dockerproxy:2375
+      - DOCKER_HOST: "tcp://dockerproxy:2375"
     image: amir20/dozzle:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/fxHzwwS/dozzle.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/amir20/dozzle/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/fxHzwwS/dozzle.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/fxHzwwS/dozzle.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/amir20/dozzle/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/fxHzwwS/dozzle.png"
     #volumes:
       #- /var/run/docker.sock:/var/run/docker.sock:ro
   fail2ban:
@@ -275,22 +249,20 @@ services:
       - NET_RAW
     container_name: fail2ban
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      <<: *env
       #- DOCKER_MODS=linuxserver/mods:swag-f2bdiscord
-      - DISC_HOOK=${DISC_HOOK}
-      - DISC_ME=${DISC_ME}
-      - DISC_API=${DISC_API}
+      DISC_HOOK: ${DISC_HOOK}
+      DISC_ME: ${DISC_ME}
+      DISC_API: ${DISC_API}
       #- MAXMINDDB_LICENSE_KEY=${MAXMINDDB_KEY}
-      - VERBOSITY=-vv
+      VERBOSITY: -vv
     image: lscr.io/linuxserver/fail2ban:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/SVn2mCj/fail2ban.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-fail2ban/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/SVn2mCj/fail2ban.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/SVn2mCj/fail2ban.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/linuxserver/docker-fail2ban/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/SVn2mCj/fail2ban.png"
     network_mode: host
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/fail2ban:/config
       - ${CONF_PATH}/fail2ban/scripts:/custom-cont-init.d
@@ -304,26 +276,22 @@ services:
       - ${CONF_PATH}/immich/log/nginx:/remotelogs/immich:ro
       - /var/log:/remotelogs/unraid:ro
   filebrowser:
-    <<: *base-default
+    <<: *base-misc
     container_name: filebrowser
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      <<: *env
     image: filebrowser/filebrowser
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/m5hJs8m/35781395.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/filebrowser/filebrowser/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/m5hJs8m/35781395.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/m5hJs8m/35781395.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/filebrowser/filebrowser/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/m5hJs8m/35781395.png"
     volumes:
       - ${CONF_PATH}/filebrowser/settings.json:/config/settings.json
       - ${CONF_PATH}/filebrowser/filebrowser.db:/database/filebrowser.db
       - ${DATA_PATH}/uploads/filebrowser:/srv
   immich:
-    <<: *base-default
+    <<: *base-misc
     container_name: immich
     depends_on:
       postgres:
@@ -331,29 +299,25 @@ services:
       redis:
         condition: service_started
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - DB_HOSTNAME=${POSTGRES_HOST}
-      - DB_USERNAME=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - DB_DATABASE_NAME=immich
-      - DB_PORT=5432
-      - REDIS_HOSTNAME=${REDIS_HOST}
-      - JWT_SECRET=${JWT_SECRET}
-      - REDIS_PORT=6379
+      <<: *env
+      DB_HOSTNAME: ${POSTGRES_HOST}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_DATABASE_NAME: immich
+      DB_PORT: 5432
+      REDIS_HOSTNAME: ${REDIS_HOST}
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_PORT: 6379
       #- REDIS_PASSWORD=
     #image: ghcr.io/imagegenius/immich:latest
     image: ghcr.io/imagegenius/immich:v1.90.2-ig224
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/myBS6Q2/immich.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/imagegenius/docker-immich/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/myBS6Q2/immich.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/myBS6Q2/immich.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/imagegenius/docker-immich/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/myBS6Q2/immich.png"
     #ports:
       #- 8085:8080
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/immich:/config
       - ${CONF_PATH}/immich/thumbs:/photos/thumbs
@@ -363,28 +327,23 @@ services:
       - ${DATA_PATH}/immich/upload:/upload
       - ${DATA_PATH}/immich/uploads:/uploads
   lidarr:
-    <<: *base-default
+    <<: *base-media
     container_name: lidarr
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/lidarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/nQrWPpB/lidarr.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/nQrWPpB/lidarr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/nQrWPpB/lidarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/nQrWPpB/lidarr.png"
     volumes:
       - ${CONF_PATH}/lidarr:/config
       - ${DATA_PATH}:/data
   notifiarr:
-    <<: *base-default
+    <<: *base-media
     cap_add:
       - SYS_RAWIO
       - SYS_ADMIN
@@ -411,20 +370,18 @@ services:
       - /dev/nvme1n1:/dev/nvme1n1
       - /dev/nvme2n1:/dev/nvme2n1
     environment:
-      - TZ=${TZ}
+      - TZ: ${TZ}
     hostname: davo1624
     image: golift/notifiarr:unstable
     #image: golift/notifiarr:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://notifiarr.com/images/logo_100x100.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/Notifiarr/notifiarr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://notifiarr.com/images/logo_100x100.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://notifiarr.com/images/logo_100x100.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/Notifiarr/notifiarr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://notifiarr.com/images/logo_100x100.png"
    #ports: 
      #- 5454:5454
     privileged: true
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/notifiarr:/config
       - ${CONF_PATH}/overseerr/logs:/remotelogs/overseerr:ro
@@ -437,120 +394,102 @@ services:
       - /var/run/utmp:/var/run/utmp
       - /mnt/user:/storage/1
   omegabrr:
-    <<: *base-default
+    <<: *base-media
     container_name: omegabrr
     environment:
-      - PGID=${PGID}
-      - PUID=${PUID}
-      - TZ=${TZ}
+      <<: *env
     image: ghcr.io/autobrr/omegabrr:main
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Q9C23Cn/index.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Q9C23Cn/index.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Q9C23Cn/index.png"
+      net.unraid.docker.icon: "https://i.ibb.co/Q9C23Cn/index.png"
     #ports:
       #- 7441:7441
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/omegabrr:/config
   orpheusbetter:
-    <<: *base-default
+    <<: *base-media
     container_name: orpheusbetter
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
+      <<: *env
     image: ghcr.io/quorn23/orpheusbetter-docker:master
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/kyqJMwy/orpheus.jpg"
-      - "net.unraid.docker.icon=https://i.ibb.co/kyqJMwy/orpheus.jpg"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/kyqJMwy/orpheus.jpg"
+      net.unraid.docker.icon: "https://i.ibb.co/kyqJMwy/orpheus.jpg"
     volumes:
       - ${CONF_PATH}/orpheusbetter:/config/.orpheusbetter
       - ${DATA_PATH}/torrents:/data/torrents
   overseerr:
-    <<: *base-default
+    <<: *base-media
     container_name: overseerr
     environment:
-      - PGID=${PGID}
-      - PUID=${PUID}
-      - UMASK=002
-      - TZ=${TZ}
+      <<: *env
     image: ghcr.io/hotio/overseerr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/JCYqR3v/overseerr.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/sct/overseerr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/JCYqR3v/overseerr.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/JCYqR3v/overseerr.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/sct/overseerr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/JCYqR3v/overseerr.png"
     #ports:
       #- "5055:5055"
-    networks:
-      - media
     volumes:
       - ${CONF_PATH}/overseerr:/config
   pgbackups:
-    <<: *base-default
+    <<: *base-media
     container_name: pgbackups
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - BACKUP_DIR:/backups
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_DB=authelia autobrr immich lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - SCHEDULE=@daily
-      - BACKUP_KEEP_DAYS=7
-      - BACKUP_KEEP_WEEKS=4
-      - BACKUP_KEEP_MONTHS=6
-      - HEALTHCHECK_PORT=8080
+      - BACKUP_DIR: "/backups"
+      - POSTGRES_HOST: ${POSTGRES_HOST}
+      - POSTGRES_DB: "authelia autobrr immich lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden"
+      - POSTGRES_USER: ${POSTGRES_USER}
+      - POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      - SCHEDULE: "@daily"
+      - BACKUP_KEEP_DAYS: 7
+      - BACKUP_KEEP_WEEKS: 4
+      - BACKUP_KEEP_MONTHS: 6
+      - HEALTHCHECK_PORT: 8080
     image: prodrigestivill/postgres-backup-local
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/XSmQBNC/database-postgres.jpg"
-      #- "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/XSmQBNC/database-postgres.jpg"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/XSmQBNC/database-postgres.jpg"
+      #org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/XSmQBNC/database-postgres.jpg"
     user: postgres:postgres
     volumes:
       - /mnt/backups/appdata/postgres:/backups
       - ${CONF_PATH}/pgbackups:/var/lib/postgresql/data
   plex:
-    <<: *base-default
+    <<: *base-media
     container_name: plex
     devices:
       - /dev/dri:/dev/dri
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      <<: *env
       #- VERSION=docker
       #- PLEX_CLAIM_TOKEN=${PLEX_CLAIM}
-      - PLEX_NO_AUTH_NETWORKS=${ALLOWED_NETWORKS}
-      - PLEX_ADVERTISE_URL=${ADVERTISE_IP}
-      - PLEX_BETA_INSTALL=true
-      - PLEX_PURGE_CODECS=true
-      - UMASK=002
-      - DEBUG=no
+      PLEX_NO_AUTH_NETWORKS: ${ALLOWED_NETWORKS}
+      PLEX_ADVERTISE_URL: ${ADVERTISE_IP}
+      PLEX_BETA_INSTALL: true
+      PLEX_PURGE_CODECS: true
+      DEBUG: no
       #- NVIDIA_VISIBLE_DEVICES=GPU-cb6c8b8e-2662-a4d2-6afd-a37a5bf5e0be
       #- NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-    #image: ghcr.io/hotio/plex:release-1.32.6.7557-1cf77d501
     image: ghcr.io/hotio/plex:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/n8gP7gh/plex.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://https://github.com/linuxserver/docker-plex/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/n8gP7gh/plex.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/n8gP7gh/plex.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://https://github.com/linuxserver/docker-plex/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/n8gP7gh/plex.png"
     ports:
       - 32400:32400
       - 1900:1900/udp #DLNA
       - 32410:32410/udp #GDM network
       - 32412-32414:32412-32414/udp #GDM network
       - 32469:32469 #DLNA
-    restart: unless-stopped
     #runtime: nvidia
     volumes:
       - ${MEDIA_PATH}:/data/media
@@ -558,82 +497,75 @@ services:
       #- ${CONF_PATH}/plex/cont-init.d/99-plex-remove-codecs.sh:/etc/cont-init.d/99-plex-remove-codecs
       - /tmp/plex:/transcode
   plex-cleanup:
-    <<: *base-default
+    <<: *base-media
     container_name: pcu
     environment:
-      - TZ=${TZ}
-      - PLEX_PATH=/plex-appdata
-      - MODE=remove
-      - PLEX_URL=http://plex:32400
-      - PLEX_TOKEN=${PLEX_TOKEN}
-      - PHOTO_TRANSCODER=true
-      - EMPTY_TRASH=true
-      - CLEAN_BUNDLES=true
-      - OPTIMIZE_DB=true
-      - DISCORD=https://discord.com/api/webhooks/url
-      - SLEEP=30
-      - SCHEDULE=02:45|daily
+      - TZ: ${TZ}
+      - PLEX_PATH: "/plex-appdata"
+      - MODE: remove
+      - PLEX_URL: "http://plex:32400"
+      - PLEX_TOKEN: ${PLEX_TOKEN}
+      - PHOTO_TRANSCODER: true
+      - EMPTY_TRASH: true
+      - CLEAN_BUNDLES: true
+      - OPTIMIZE_DB: true
+      - DISCORD: "https://discord.com/api/webhooks/1097534004049219595/OSJ11jRT20skfn0t8rfIU1ntz0bdfhglC4M8X4HUjQoPYttTl1IG9GE_KjWV50UBvlGj"
+      - SLEEP: 30
+      - SCHEDULE: "02:45|daily"
     image: meisnate12/plex-image-cleanup
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/meisnate12/Plex-Image-Cleanup/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/meisnate12/Plex-Image-Cleanup/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/VJp47kj/plex-image-cleanup.jpg"
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pcu:/config
       - ${CONF_PATH}/plex:/plex-appdata
   plex-meta-manager:
-    <<: *base-default
+    <<: *base-media
     container_name: pmm
     environment:
-      - PMM_TIME=02:00
-      - PMM_DIVIDER==
-      - PMM_WIDTH=200
-      - TZ=${TZ}
+      - PMM_TIME: "02:00"
+      - PMM_DIVIDER: "="
+      - PMM_WIDTH: 200
+      - TZ: ${TZ}
     image: meisnate12/plex-meta-manager:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/meisnate12/Plex-Meta-Manager/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/meisnate12/Plex-Meta-Manager/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pmm:/config
   plextraktsync:
-    <<: *base-default
+    <<: *base-media
     container_name: plextraktsync
     image: ghcr.io/taxel/plextraktsync:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Xztgr81/trakt.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Xztgr81/trakt.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Xztgr81/trakt.png"
+      net.unraid.docker.icon: "https://i.ibb.co/Xztgr81/trakt.png"
     volumes:
       - ${CONF_PATH}/plextraktsync:/app/config
   portainer:
-    <<: *base-default
+    <<: *base-misc
     container_name: portainer
     environment:
-      - VIRTUAL_PORT=9000
-      - VIRTUAL_HOST=portainer.${DOMAIN}
-      - PATH='/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+      - VIRTUAL_PORT: 9000
+      - VIRTUAL_HOST: portainer.${DOMAIN}
+      - PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     image: portainer/portainer-ce:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/wNvTzYV/portainer.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/portainer/portainer/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/wNvTzYV/portainer.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/wNvTzYV/portainer.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/portainer/portainer/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/wNvTzYV/portainer.png"
     mac_address: "02:42:ac:11:00:06"
-    networks:
-      - misc
     #ports:
       #- 9443:9443
       #- 9000:9000
-    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${CONF_PATH}/portainer:/data
@@ -641,19 +573,21 @@ services:
     <<: *base-default
     container_name: postgres
     environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - TZ="GMT-4"
-      - PGTZ="GMT-4"
+      - POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      - TZ: "GMT-4"
+      - PGTZ: "GMT-4"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 3
+    #image: postgres:14-alpine
     image: pgautoupgrade/pgautoupgrade:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/NCgNfC8/pgadmin.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/NCgNfC8/pgadmin.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/NCgNfC8/pgadmin.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/NCgNfC8/pgadmin.png"
     networks:
       - misc
       - media
@@ -666,59 +600,49 @@ services:
     <<: *base-default
     container_name: powershell
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
+      <<: *env
     image: mcr.microsoft.com/powershell:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
-    networks:
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/RafhaanShah/Container-Mon/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/KVW35hR/Power-Shell-5-0-icon.png"
+    neworks:
       - media
-    restart: "no"
+    restart: no
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: 'pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose'
+    command: "pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose"
   prowlarr:
-    <<: *base-default
+    <<: *base-media
     container_name: prowlarr
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/prowlarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://notifiarr.com/images/logo/prowlarr.png"
-      - "net.unraid.docker.icon=https://notifiarr.com/images/logo/prowlarr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://notifiarr.com/images/logo/prowlarr.png"
+      net.unraid.docker.icon: "https://notifiarr.com/images/logo/prowlarr.png"
     volumes:
       - ${CONF_PATH}/prowlarr:/config
   qbit-manage:
-    <<: *base-default
+    <<: *base-media
     container_name: qbit-manage
     environment:
-      - QBT_SCHEDULE=60
-      - QBT_STARTUP_DELAY=30
-      - QBT_CONFIG=config_*.yml
-      - QBT_LOGFILE=/config/logs/qbitmanage.log
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
+      QBT_SCHEDULE: 60
+      QBT_STARTUP_DELAY: 30
+      QBT_CONFIG: config_*.yml
+      QBT_LOGFILE: /config/logs/qbitmanage.log
     image: ghcr.io/hotio/qbitmanage:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/w74ZSL5/qbitmanage.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/StuffAnThings/qbit_manage/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/w74ZSL5/qbitmanage.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/w74ZSL5/qbitmanage.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/StuffAnThings/qbit_manage/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/w74ZSL5/qbitmanage.png"
     volumes:
       - ${CONF_PATH}/qbm:/config
       - ${CONF_PATH}/qbit-misc/data/BT_backup:/torrents-misc
@@ -727,22 +651,21 @@ services:
       - ${DATA_PATH}/torrents:/data/torrents
   qbit-misc:
     <<: *base-default
-    cap_add:
-      - NET_ADMIN
     container_name: qbit-misc
+    #dns:
+      #- 9.9.9.9
+      #- 1.1.1.1
     depends_on:
       qbit-movies:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=002
-      - TZ=${TZ}
-      - VPN_ENABLED=false
-      - VPN_LAN_NETWORK=192.168.30.0/24
-      - VPN_CONF=wg0
-      - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=false
+      <<: *env
+      VPN_ENABLED: false
+      #VPN_LAN_NETWORK: "192.168.30.0/24"
+      #VPN_CONF: wg0
+      #VPN_ADDITIONAL_PORTS:
+      PRIVOXY_ENABLED: false
+      #VPN_IP_CHECK_EXIT=false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
       interval: 15s
@@ -751,18 +674,24 @@ services:
       timeout: 10s
     image: docker.io/hotio/qbittorrent:release-4.6.3
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
     network_mode: container:qbit-movies
+    #networks:
+      #- media
+    #ports:
+      #- 8118:8118
+      #- 8080:8080
     restart: unless-stopped
     sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv4.conf.all.src_valid_mark: 1
+      - net.ipv6.conf.all.disable_ipv6: 1
     volumes:
       - ${CONF_PATH}/qbit-misc:/config
       - ${DATA_PATH}/torrents:/data/torrents
   qbit-movies:
-    <<: *base-default
+    <<: *base-media
     cap_add:
       - NET_ADMIN
     container_name: qbit-movies
@@ -770,16 +699,14 @@ services:
       - 9.9.9.9
       - 1.1.1.1
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=002
-      - TZ=${TZ}
-      - VPN_ENABLED=true
-      - VPN_LAN_NETWORK=192.168.30.0/24
-      - VPN_CONF=wg0
-      - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=true
-      - WEBUI_PORTS=8083/tcp
+      <<: *env
+      VPN_ENABLED: true
+      VPN_LAN_NETWORK: "192.168.30.0/24"
+      VPN_CONF: "wg0"
+      VPN_ADDITIONAL_PORTS:
+      PRIVOXY_ENABLED: true
+      WEBUI_PORTS: "8083/tcp"
+      #VPN_IP_CHECK_EXIT: false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
       interval: 15s
@@ -788,41 +715,38 @@ services:
       timeout: 10s
     image: docker.io/hotio/qbittorrent:release-4.6.3
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
     ports:
       - 8118:8118
       - 8083:8083
       - 8082:8082
       - 8080:8080
-    restart: unless-stopped
     sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv4.conf.all.src_valid_mark: 1
+      - net.ipv6.conf.all.disable_ipv6: 1
     volumes:
       - ${CONF_PATH}/qbit-movies:/config
       - ${DATA_PATH}/torrents:/data/torrents
   qbit-tv:
     <<: *base-default
-    cap_add:
-      - NET_ADMIN
     container_name: qbit-tv
+    #dns:
+      #- 9.9.9.9
+      #- 1.1.1.1
     depends_on:
       qbit-movies:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - UMASK=002
-      - TZ=${TZ}
-      - VPN_ENABLED=false
-      - VPN_LAN_NETWORK=192.168.30.0/24
-      - VPN_CONF=wg0
-      - VPN_ADDITIONAL_PORTS=
-      - PRIVOXY_ENABLED=false
-      - WEBUI_PORTS=8082/tcp
+      <<: *env
+      VPN_ENABLED: false
+      #VPN_LAN_NETWORK: "192.168.30.0/24"
+      #VPN_CONF: "wg0"
+      #VPN_ADDITIONAL_PORTS:
+      #PRIVOXY_ENABLED: "false"
+      WEBUI_PORTS: "8082/tcp"
+      #VPN_IP_CHECK_EXIT: false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
       interval: 15s
@@ -831,86 +755,76 @@ services:
       timeout: 10s
     image: docker.io/hotio/qbittorrent:release-4.6.3
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+      net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
+    #networks:
+      #- media
     network_mode: container:qbit-movies
+    #ports:
+      #- 8118:8118
+      #- 8082:8082
     restart: unless-stopped
     sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
-      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv4.conf.all.src_valid_mark: 1
+      - net.ipv6.conf.all.disable_ipv6: 1
     volumes:
       - ${CONF_PATH}/qbit-tv:/config
       - ${DATA_PATH}/torrents:/data/torrents
   radarr:
-    <<: *base-default
+    <<: *base-media
     container_name: radarr
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/radarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/ZNZFvGr/radarr.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/ZNZFvGr/radarr.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/ZNZFvGr/radarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/ZNZFvGr/radarr.png"
     #ports:
       #- 7878:7878
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/radarr:/config
       - ${DATA_PATH}:/data
   radarr-4k:
-    <<: *base-default
+    <<: *base-media
     container_name: radarr-4k
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
-      - TP_ADDON=radarr-4k-logo
+      <<: *env
     image: ghcr.io/hotio/radarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/ZNZFvGr/radarr.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/ZNZFvGr/radarr.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/ZNZFvGr/radarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/ZNZFvGr/radarr.png"
     #ports:
       #- 7879:7878
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/radarr-4k:/config
       - ${DATA_PATH}:/data
   readarr:
-    <<: *base-default
+    <<: *base-media
     container_name: readarr
     depends_on:
       - calibre
       - postgres
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/readarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/4TYxfXr/readarr.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/4TYxfXr/readarr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/4TYxfXr/readarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/4TYxfXr/readarr.png"
     volumes:
       - ${CONF_PATH}/readarr:/config
       - ${DATA_PATH}:/data
   redis:
-    <<: *base-default
+    <<: *base-misc
     container_name: redis
     depends_on:
       postgres:
@@ -922,74 +836,60 @@ services:
       retries: 5
     image: redis:alpine
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/fHGHz6L/redis.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/redis/redis/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/fHGHz6L/redis.png"
-    networks:
-      - misc
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/fHGHz6L/redis.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/redis/redis/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/fHGHz6L/redis.png"
     volumes:
       - ${CONF_PATH}/redis:/data
   restic:
-    <<: *base-default
+    <<: *base-misc
     container_name: restic
     environment:
-      - B2_ACCOUNT_ID=${B2_ACCOUNT_ID}
-      - B2_ACCOUNT_KEY=${B2_ACCOUNT_KEY}
-      - BACKUP_CRON=45 4 */2 * *
-      - RESTIC_REPOSITORY=${RESTIC_REPOSITORY}
-      - RESTIC_PASSWORD=${RESTIC_PASSWORD}
-      - RESTIC_TAG=appdata
-      - RESTIC_FORGET_ARGS=--keep-daily 7
-      - TZ=${TZ}
+      - B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
+      - B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
+      - BACKUP_CRON: 45 4 */2 * *
+      - RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
+      - RESTIC_PASSWORD: ${RESTIC_PASSWORD}
+      - RESTIC_TAG: appdata
+      - RESTIC_FORGET_ARGS: --keep-daily 7
+      - TZ: ${TZ}
     hostname: restic
     image: lobaro/restic-backup-docker:latest
     labels:
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/lobaro/restic-backup-docker/releases\", \"label\": \"changelog\"}" 
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/52P4CMx/restic.jpg"
-      - "net.unraid.docker.icon=https://i.ibb.co/52P4CMx/restic.jpg"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/lobaro/restic-backup-docker/releases\", \"label\": \"changelog\"}" 
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/52P4CMx/restic.jpg"
+      net.unraid.docker.icon: "https://i.ibb.co/52P4CMx/restic.jpg"
     volumes:
       - ${BACKUP_PATH}:/data
-    restart: unless-stopped
   sabnzbd:
-    <<: *base-default
+    <<: *base-media
     container_name: sabnzbd
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/sabnzbd:testing
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/VJ3ZCFK/icon.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/VJ3ZCFK/icon.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/VJ3ZCFK/icon.png"
+      net.unraid.docker.icon: "https://i.ibb.co/VJ3ZCFK/icon.png"
    #ports:
      #- 9090:8080
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/sabnzbd:/config
       - ${DATA_PATH}:/data
   sonarr:
-    <<: *base-default
+    <<: *base-media
     container_name: sonarr
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/sonarr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/3h0x1y2/sonarr.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/3h0x1y2/sonarr.png"
-    networks:
-      - media
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/3h0x1y2/sonarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/3h0x1y2/sonarr.png"
     #ports:
       #- 8989:8989
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/sonarr:/config
       - ${DATA_PATH}:/data
@@ -997,13 +897,12 @@ services:
     <<: *base-default
     container_name: soulseek
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      <<: *env
     image: realies/soulseek:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/HGzzQZ5/soulseek.png"
-      - "net.unraid.docker.icon=https://i.ibb.co/HGzzQZ5/soulseek.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/HGzzQZ5/soulseek.png"
+      net.unraid.docker.icon: "https://i.ibb.co/HGzzQZ5/soulseek.png"
     networks:
       - wg2
     ports:
@@ -1020,38 +919,35 @@ services:
       - NET_ADMIN
     container_name: swag
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - URL=${URL}
-      - SUBDOMAINS=wildcard
-      - VALIDATION=dns
-      - DNSPLUGIN=cloudflare
-      - EXTRA_DOMAINS=${EXTRA_DOMAINS}
-      - EMAIL=${EMAIL}
-      - ONLY_SUBDOMAINS=false
-      - MAXMINDDB_LICENSE_KEY=${MAXMINDDB_KEY}
-      - DOCKER_MODS=linuxserver/mods:swag-cloudflare-real-ip|linuxserver/mods:swag-f2bdiscord|linuxserver/mods:swag-auto-reload|linuxserver/mods:swag-maxmind
-      - DISC_HOOK=${DISC_HOOK}
-      - DISC_ME=${DISC_ME}
-      - DISC_API=${DISC_API}
-      - TP_BRANCH=live
-      #- FILE__CF_TUNNEL_CONFIG=/config/config.yml
-      #- CF_ZONE_ID=${CF_ZONE_ID}
-      #- CF_ACCOUNT_ID=${CF_ACCOUNT_ID}
-      #- CF_API_TOKEN=${CF_SWAG_TOKEN}
-      #- CF_TUNNEL_NAME=${CF_TUNNEL_NAME}
-      #- CF_TUNNEL_PASSWORD=${CF_TUNNEL_PASSWORD}
-      #- CF_TUNNEL_CONFIG: |
+      <<: *env
+      SUBDOMAINS: wildcard
+      VALIDATION: dns
+      DNSPLUGIN: cloudflare
+      EXTRA_DOMAINS: ${EXTRA_DOMAINS}
+      EMAIL: ${EMAIL}
+      ONLY_SUBDOMAINS: false
+      MAXMINDDB_LICENSE_KEY: ${MAXMINDDB_KEY}
+      DOCKER_MODS: linuxserver/mods:swag-cloudflare-real-ip|linuxserver/mods:swag-f2bdiscord|linuxserver/mods:swag-auto-reload|linuxserver/mods:swag-maxmind
+      DISC_HOOK: ${DISC_HOOK}
+      DISC_ME: ${DISC_ME}
+      DISC_API: ${DISC_API}
+      #FILE__CF_TUNNEL_CONFIG=/config/config.yml
+      #CF_ZONE_ID=${CF_ZONE_ID}
+      #CF_ACCOUNT_ID=${CF_ACCOUNT_ID}
+      #CF_API_TOKEN=${CF_SWAG_TOKEN}
+      #CF_TUNNEL_NAME=${CF_TUNNEL_NAME}
+      #CF_TUNNEL_PASSWORD=${CF_TUNNEL_PASSWORD}
+      #CF_TUNNEL_CONFIG: |
           #ingress:
             #- hostname: ${URL}
               #service: http://localhost:80
             #- service: http_status:404
     image: lscr.io/linuxserver/swag:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/nw5w038/swag.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-swag/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/nw5w038/swag.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/nw5w038/swag.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/linuxserver/docker-swag/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/nw5w038/swag.png"
     networks:
       - media
       - misc
@@ -1063,132 +959,113 @@ services:
       - ${CONF_PATH}/swag:/config
       - ${CONF_PATH}/swag/config/log/debug:/var/log/letsencrypt
   tautulli:
-    <<: *base-default
+    <<: *base-media
     container_name: tautulli
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - UMASK=002
+      <<: *env
     image: ghcr.io/hotio/tautulli:testing
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/4d5DF9m/tautulli.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/Tautulli/Tautulli/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/4d5DF9m/tautulli.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/4d5DF9m/tautulli.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/Tautulli/Tautulli/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/4d5DF9m/tautulli.png"
     volumes:
       - ${CONF_PATH}/tautulli:/config
   unpackerr:
-    <<: *base-default
+    <<: *base-media
     container_name: unpackerr
     environment:
-      - UMASK=002
+      - UMASK: 002
     image: ghcr.io/hotio/unpackerr:nightly
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/v3NRWs5/unpackerr.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/davidnewhall/unpackerr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/v3NRWs5/unpackerr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/v3NRWs5/unpackerr.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/davidnewhall/unpackerr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/v3NRWs5/unpackerr.png"
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges: true
     volumes:
       - ${CONF_PATH}/unpackerr:/config
       - ${DATA_PATH}:/data
   upgraderr:
-    <<: *base-default
+    <<: *base-media
     container_name: upgraderr
     image: ghcr.io/kylesanderson/upgraderr:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/tMLYkkb/upgraderr.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/KyleSanderson/upgraderr/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/tMLYkkb/upgraderr.png"
-    networks:
-      - media
-    restart: unless-stopped
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/tMLYkkb/upgraderr.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/KyleSanderson/upgraderr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/tMLYkkb/upgraderr.png"
   vaultwarden:
-    <<: *base-default
+    <<: *base-misc
     container_name: bitwarden
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      - ROCKET_ENV=staging
-      - ROCKET_PORT=80
-      - ROCKET_WORKERS=10
-      - DOMAIN=https://bitwarden.${DOMAIN}
-      - WEBSOCKET_ENABLED=true
-      - WEB_VAULT_ENABLED=true
-      - LOG_FILE=/data/vaultwarden.log
-      - TZ=${TZ}
-      - SERVER_ADMIN_EMAIL=${EMAIL}
-      - SIGNUPS_ALLOWED=true
-      - SIGNUPS_VERIFY=true
-      - INVITATIONS_ALLOWED=true
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
-      - "DATABASE_URL=postgresql://postgres:docker@postgres:5432/vaultwarden"
+      - PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - ROCKET_ENV: staging
+      - ROCKET_PORT: 80
+      - ROCKET_WORKERS: 10
+      - DOMAIN: https://bitwarden.${DOMAIN}
+      - WEBSOCKET_ENABLED: true
+      - WEB_VAULT_ENABLED: true
+      - LOG_FILE: /data/vaultwarden.log
+      - TZ: ${TZ}
+      - SERVER_ADMIN_EMAIL: ${EMAIL}
+      - SIGNUPS_ALLOWED: true
+      - SIGNUPS_VERIFY: true
+      - INVITATIONS_ALLOWED: true
+      - ADMIN_TOKEN: ${ADMIN_TOKEN}
+      - DATABASE_URL: postgresql://postgres:${POSTGRES_PASS}@postgres:5432/vaultwarden
     image: vaultwarden/server:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/nMXr6fh/bitwarden.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/dani-garcia/vaultwarden/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/nMXr6fh/bitwarden.png"
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/nMXr6fh/bitwarden.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/dani-garcia/vaultwarden/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/nMXr6fh/bitwarden.png"
     mac_address: "02:42:ac:11:00:05"
-    networks:
-      - misc
     #ports:
       #- 4743:80
-    restart: always
     volumes:
       - ${CONF_PATH}/vaultwarden:/data
   webtop:
-    <<: *base-default
+    <<: *base-misc
     container_name: webtop
     devices:
       - /dev/dri:/dev/dri
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      - SUBFOLDER=/
-      - TITLE=Webtop
+      <<: *env
+      SUBFOLDER: "/"
+      TITLE: "Webtop"
     image: lscr.io/linuxserver/webtop:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/N7f1CRT/webtop.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/N7f1CRT/webtop.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/N7f1CRT/webtop.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/linuxserver/docker-webtop/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/N7f1CRT/webtop.png"
     #ports:
       #- 3000:3000
       #- 3001:3001
-    restart: unless-stopped
-    shm_size: "1gb"
+    shm_size: 1gb
     volumes:
       - ${CONF_PATH}/webtop:/config
       - ${DATA_PATH}:/data
       #- /var/run/docker.sock:/var/run/docker.sock #optional
   xbackbone:
-    <<: *base-default
+    <<: *base-misc
     container_name: xbackbone
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      <<: *env
     image: lscr.io/linuxserver/xbackbone:latest
     labels:
-      - "org.hotio.pullio.author.avatar=https://i.ibb.co/M6L6KV3/xbackbone.png"
-      - "org.hotio.pullio.author.url={\"link\": \"https://github.com/linuxserver/docker-xbackbone/releases\", \"label\": \"changelog\"}"
-      - "net.unraid.docker.icon=https://i.ibb.co/M6L6KV3/xbackbone.png"
-    networks:
-      - misc
+      <<: *labels
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/M6L6KV3/xbackbone.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/linuxserver/docker-xbackbone/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/M6L6KV3/xbackbone.png"
     #ports:
       #- 80:80
       #- 443:443
-    restart: unless-stopped
     volumes:
       - ${CONF_PATH}/xbackbone:/config
       - ${DATA_PATH}/uploads/xbackbone:/uploads
