@@ -509,7 +509,7 @@ services:
       - EMPTY_TRASH: true
       - CLEAN_BUNDLES: true
       - OPTIMIZE_DB: true
-      - DISCORD: "https://discord.com/api/webhooks/1097534004049219595/OSJ11jRT20skfn0t8rfIU1ntz0bdfhglC4M8X4HUjQoPYttTl1IG9GE_KjWV50UBvlGj"
+      - DISCORD: "https://discord.com/api/webhooks/url"
       - SLEEP: 30
       - SCHEDULE: "02:45|daily"
     image: meisnate12/plex-image-cleanup
