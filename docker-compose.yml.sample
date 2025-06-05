@@ -35,6 +35,7 @@ services:
         condition: service_healthy
     environment:
       TZ: ${TZ}
+    hostname: authelia.internal
     image: authelia/authelia:latest
     labels:
       <<: *pullio
@@ -51,6 +52,7 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+    hostname: autobrr.internal
     image: ghcr.io/autobrr/autobrr:latest
     labels:
       <<: *pullio
@@ -70,7 +72,7 @@ services:
          condition: service_healthy
     environment:
       <<: *env
-      #AUTOPULSE__APP__DATABASE_URL: postgres://postgres:docker@postgres/autopulse
+    hostname: autopulse.internal
     image: danonline/autopulse:latest-postgres
     #ports:
       #- 2875:2875
@@ -140,6 +142,7 @@ services:
     container_name: bazarr
     environment:
       <<: *env
+    hostname: bazarr.internal
     image: ghcr.io/hotio/bazarr:nightly
     labels:
       <<: *pullio
@@ -164,6 +167,7 @@ services:
       DOCKER_HOST: "tcp://dockerproxy:2375"
       PORT: 45876
       KEY: ${BESZEL_AGENT}
+    #hostname: beszel-agent.internal
     image: henrygd/beszel-agent:latest
     labels:
       <<: *pullio
@@ -182,6 +186,7 @@ services:
         restart: true
     #extra_hosts:
       #- host.docker.internal:host-gateway
+    #hostname: beszel.internal
     image: henrygd/beszel:latest
     labels:
       <<: *pullio
@@ -196,6 +201,7 @@ services:
   calibre:
     <<: *base-media
     container_name: calibre
+    hostname: calibre.internal
     environment:
       <<: *env
     image: lscr.io/linuxserver/calibre:latest
@@ -216,6 +222,7 @@ services:
     container_name: container-monitor
     depends_on:
       - dockerproxy
+    hostname: container-monitor.internal
     environment:
       DOCKER_API_VERSION: 1.41
       DOCKER_HOST: "tcp://dockerproxy:2375"
@@ -237,9 +244,10 @@ services:
     depends_on:
       - qbit-movies
       - prowlarr
+    hostname: cross-seed-movies.internal
     environment:
       TZ: ${TZ}
-    image: crossseed/cross-seed:6.9.1
+    image: crossseed/cross-seed:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
@@ -257,9 +265,10 @@ services:
     depends_on:
       - qbit-tv
       - prowlarr
+    hostname: cross-seed-tv.internal
     environment:
       TZ: ${TZ}
-    image: crossseed/cross-seed:6.9.1
+    image: crossseed/cross-seed:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
@@ -278,6 +287,7 @@ services:
       POST: 0
       CONTAINERS: 1
       INFO: 1
+    hostname: dockerproxy.internal
     image: lscr.io/linuxserver/socket-proxy:latest
     labels:
       <<: *pullio
@@ -295,6 +305,7 @@ services:
         restart: true
       dockerproxy:
         condition: service_started
+    #hostname: dozzle.internal
     environment:
       <<: *env
       DOCKER_HOST: "tcp://dockerproxy:2375"
@@ -322,6 +333,7 @@ services:
       DISC_ME: ${DISC_ME}
       DISC_API: ${DISC_API}
       VERBOSITY: -vv
+    hostname: fail2ban.internal
     image: lscr.io/linuxserver/fail2ban:latest
     labels:
       <<: *pullio
@@ -343,6 +355,7 @@ services:
   immich-server:
     <<: *base-misc
     container_name: immich_server
+    hostname: immich-server.internal
     image: ghcr.io/immich-app/immich-server:release
     # extends:
     #   file: hwaccel.transcoding.yml
@@ -376,7 +389,12 @@ services:
   immich-machine-learning:
     <<: *base-misc
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:release
+    device_cgroup_rules:
+      - 'c 189:* rmw'
+    devices:
+      - /dev/dri:/dev/dri
+    hostname: immich-machine-learning.internal
+    image: ghcr.io/immich-app/immich-machine-learning:release-openvino
     # extends:
     #   file: hwaccel.ml.yml
     #   service: cpu # set to one of [armnn, cuda, openvino, openvino-wsl] for accelerated inference
@@ -388,13 +406,15 @@ services:
       net.unraid.docker.icon: "https://i.ibb.co/Rzdj77F/immich.png"
     volumes:
       - ${CONF_PATH}/immich/learning:/cache
+      - /dev/bus/usb:/dev/bus/usb
     restart: unless-stopped
     healthcheck:
       disable: false
   immich-postgres:
     <<: *base-misc
     container_name: immich_postgres
-    image: tensorchord/pgvecto-rs:pg14-v0.2.0@sha256:90724186f0a3517cf6914295b5ab410db9ce23190a2d9d0b9dd6463e3fa298f0
+    hostname: immich-postgres.internal
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
     environment:
       <<: *env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -409,27 +429,6 @@ services:
       - ${CONF_PATH}/immich/postgres:/var/lib/postgresql/data
     #ports:
       #- 5432:5432
-    healthcheck:
-      test: pg_isready --dbname='immich' --username='${POSTGRES_USER}' || exit 1; Chksum="$$(psql --dbname='immich' --username='${POSTGRES_USER}' --tuples-only --no-align --command='SELECT COALESCE(SUM(checksum_failures), 0) FROM pg_stat_database')"; echo "checksum failure count is $$Chksum"; [ "$$Chksum" = '0' ] || exit 1
-      interval: 5m
-      start_interval: 30s
-      start_period: 5m
-    command:
-      [
-        'postgres',
-        '-c',
-        'shared_preload_libraries=vectors.so',
-        '-c',
-        'search_path="$$user", public, vectors',
-        '-c',
-        'logging_collector=on',
-        '-c',
-        'max_wal_size=2GB',
-        '-c',
-        'shared_buffers=512MB',
-        '-c',
-        'wal_compression=on',
-      ]
   jellyseerr:
     <<: *base-media
     container_name: jellyseerr
@@ -439,6 +438,7 @@ services:
       DB_HOST: ${POSTGRES_HOST}
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
+    hostname: jellyseerr.internal
     image: ghcr.io/hotio/jellyseerr
     labels:
       <<: *pullio
@@ -460,6 +460,7 @@ services:
     environment:
       <<: *env
     #image: ghcr.io/hotio/lidarr:nightly
+    hostname: lidarr.internal
     image: ghcr.io/hotio/lidarr:pr-plugins
     labels:
       <<: *pullio
@@ -485,9 +486,10 @@ services:
       ONLINE_MODE: true
       LEVEL_TYPE: default
       ENFORCE_WHITELIST: true
-      WHITE_LIST_USERS: ""
+      WHITE_LIST_USERS: "dav01624"
       SERVER_PORT: 19132
-      OPS: "2535411681598661"
+      OPS: ""
+    hostname: minecraft.internal
     image: itzg/minecraft-bedrock-server
     labels:
       <<: *pullio
@@ -581,7 +583,7 @@ services:
     environment:
       BACKUP_DIR: /backups
       POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_DB: "authelia autobrr lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden"
+      POSTGRES_DB: "authelia autobrr autopulse jellyseerr lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden"
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SCHEDULE: "@daily"
@@ -589,6 +591,7 @@ services:
       BACKUP_KEEP_WEEKS: 4
       BACKUP_KEEP_MONTHS: 6
       HEALTHCHECK_PORT: 8080
+    hostname: pgbackups.internal
     image: prodrigestivill/postgres-backup-local
     labels:
       <<: *pullio
@@ -614,6 +617,7 @@ services:
       DEBUG: no
       #- NVIDIA_VISIBLE_DEVICES=GPU-cb6c8b8e-2662-a4d2-6afd-a37a5bf5e0be
       #- NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+    hostname: plex.internal
     image: ghcr.io/hotio/plex:latest
     labels:
       <<: *pullio
@@ -652,6 +656,7 @@ services:
       DISCORD: "https://discord.com/api/webhooks/webhook"
       SLEEP: 30
       SCHEDULE: "02:45|daily"
+    hostname: plex-cleanup.internal
     image: kometateam/imagemaid
     labels:
       <<: *pullio
@@ -670,6 +675,7 @@ services:
       PMM_DIVIDER: "="
       PMM_WIDTH: 200
       TZ: ${TZ}
+    hostname: plex-meta-manager.internal
     image: kometateam/kometa:nightly
     labels:
       <<: *pullio
@@ -679,17 +685,6 @@ services:
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pmm:/config
-  plextraktsync:
-    <<: *base-media
-    container_name: plextraktsync
-    image: ghcr.io/taxel/plextraktsync:latest
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/Xztgr81/trakt.png"
-      net.unraid.docker.icon: "https://i.ibb.co/Xztgr81/trakt.png"
-    restart: no
-    volumes:
-      - ${CONF_PATH}/plextraktsync:/app/config
   portainer:
     <<: *base-misc
     container_name: portainer
@@ -697,6 +692,7 @@ services:
       VIRTUAL_PORT: 9000
       VIRTUAL_HOST: portainer.${DOMAIN}
       PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    hostname: portainer.internal
     image: portainer/portainer-ce:latest
     labels:
       <<: *pullio
@@ -722,6 +718,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
+    hostname: postgres.internal
     image: pgautoupgrade/pgautoupgrade:latest
     labels:
       <<: *pullio
@@ -753,7 +750,7 @@ services:
     restart: no
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: "pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose"
+    command: "pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose"
   prowlarr:
     <<: *base-media
     container_name: prowlarr
@@ -763,6 +760,7 @@ services:
     environment:
       <<: *env
     image: ghcr.io/hotio/prowlarr:nightly
+    hostname: prowlarr.internal
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://notifiarr.com/images/logo/prowlarr.png"
@@ -779,6 +777,7 @@ services:
       QBT_CONFIG: config_*.yml
       QBT_LOGFILE: /config/logs/qbitmanage.log
       #QBT_TRACE: true
+    hostname: qbit-manage.internal
     image: ghcr.io/hotio/qbitmanage:nightly
     labels:
       <<: *pullio
@@ -794,49 +793,30 @@ services:
       - ${DATA_PATH}/tv/torrents:/data/tv/torrents
       - ${DATA_PATH}/misc/torrents:/data/misc/torrents
   qbit-movies:
-    <<: *base-media
+    <<: *base-default
     cap_add:
       - NET_ADMIN
     container_name: qbit-movies
-    dns:
-      - 1.1.1.1
-      - 1.0.0.1
+    depends_on:
+      vpn-client:
+        condition: service_healthy
     environment:
       <<: *env
-      VPN_ENABLED: true
-      VPN_LAN_NETWORK: "192.168.30.0/24"
-      VPN_LAN_LEAK_ENABLED: false
-      VPN_CONF: wg0
-      VPN_EXPOSE_PORTS_ON_LAN:
-      VPN_AUTO_PORT_FORWARD: true
-      VPN_AUTO_PORT_FORWARD_TO_PORTS:
-      VPN_KEEP_LOCAL_DNS: true
-      VPN_PROVIDER: generic
-      VPN_FIREWALL_TYPE: auto
-      PRIVOXY_ENABLED: true
+      VPN_ENABLED: false
       WEBUI_PORTS: "8083/tcp"
-      #VPN_HEALTHCHECK_ENABLED: true
-      #VPN_IP_CHECK_EXIT: false
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
       interval: 15s
       retries: 5
       start_period: 20s
       timeout: 10s
-    image: docker.io/hotio/qbittorrent:release-4.6.7
+    #hostname: qbit-movies.internal
+    image: docker.io/hotio/qbittorrent:release-5.0.4
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    ports:
-      - 5030:5030 #soulseek
-      - 8118:8118 #privoxy
-      - 8083:8083 #qbit-movies
-      - 8082:8082 #qbit-tv
-      - 8084:8084 #qbit-misc
-    sysctls:
-      net.ipv4.conf.all.src_valid_mark: 1
-      net.ipv6.conf.all.disable_ipv6: 1
+    network_mode: container:vpn-client
     volumes:
       - ${CONF_PATH}/qbit-movies:/config
       - ${DATA_PATH}/movies/torrents:/data/movies/torrents
@@ -844,22 +824,11 @@ services:
     <<: *base-default
     container_name: qbit-misc
     depends_on:
-      qbit-movies:
+      vpn-client:
         condition: service_healthy
     environment:
       <<: *env
       VPN_ENABLED: false
-      VPN_LAN_NETWORK: "192.168.30.0/24"
-      VPN_LAN_LEAK_ENABLED: false
-      VPN_CONF: wg0
-      VPN_EXPOSE_PORTS_ON_LAN:
-      VPN_AUTO_PORT_FORWARD: true
-      VPN_AUTO_PORT_FORWARD_TO_PORTS:
-      VPN_KEEP_LOCAL_DNS: true
-      VPN_PROVIDER: generic
-      VPN_FIREWALL_TYPE: auto
-      PRIVOXY_ENABLED: false
-      #VPN_HEALTHCHECK_ENABLED: true
       WEBUI_PORTS: "8084/tcp"
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
@@ -867,12 +836,13 @@ services:
       retries: 5
       start_period: 20s
       timeout: 10s
-    image: docker.io/hotio/qbittorrent:release-4.6.7
+    #hostname: qbit-misc.internal
+    image: docker.io/hotio/qbittorrent:release-5.0.4
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    network_mode: container:qbit-movies
+    network_mode: container:vpn-client
     volumes:
       - ${CONF_PATH}/qbit-misc:/config
       - ${DATA_PATH}/misc/torrents:/data/misc/torrents
@@ -880,22 +850,11 @@ services:
     <<: *base-default
     container_name: qbit-tv
     depends_on:
-      qbit-movies:
+      vpn-client:
         condition: service_healthy
     environment:
       <<: *env
       VPN_ENABLED: false
-      VPN_LAN_NETWORK: "192.168.30.0/24"
-      VPN_LAN_LEAK_ENABLED: false
-      VPN_CONF: wg0
-      VPN_EXPOSE_PORTS_ON_LAN:
-      VPN_AUTO_PORT_FORWARD: true
-      VPN_AUTO_PORT_FORWARD_TO_PORTS:
-      VPN_KEEP_LOCAL_DNS: true
-      VPN_PROVIDER: generic
-      VPN_FIREWALL_TYPE: auto
-      #VPN_HEALTHCHECK_ENABLED: true
-      PRIVOXY_ENABLED: false
       WEBUI_PORTS: "8082/tcp"
     healthcheck:
       test: curl --fail https://icanhazip.com || exit 1
@@ -903,12 +862,13 @@ services:
       retries: 5
       start_period: 20s
       timeout: 10s
-    image: docker.io/hotio/qbittorrent:release-4.6.7
+    #hostname: qbit-tv.internal
+    image: docker.io/hotio/qbittorrent:release-5.0.4
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
       net.unraid.docker.icon: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
-    network_mode: container:qbit-movies
+    network_mode: container:vpn-client
     volumes:
       - ${CONF_PATH}/qbit-tv:/config
       - ${DATA_PATH}/tv/torrents:/data/tv/torrents
@@ -920,6 +880,7 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+    hostname: radarr.internal
     image: ghcr.io/hotio/radarr:nightly
     labels:
       <<: *pullio
@@ -938,6 +899,7 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+    hostname: radarr-4k.internal
     image: ghcr.io/hotio/radarr:nightly
     labels:
       <<: *pullio
@@ -957,6 +919,7 @@ services:
       - postgres
     environment:
       <<: *env
+    hostname: readarr.internal
     image: ghcr.io/hotio/readarr:nightly
     labels:
       <<: *pullio
@@ -976,6 +939,7 @@ services:
       interval: 1s
       timeout: 3s
       retries: 5
+    hostname: redis.internal
     image: redis:alpine
     labels:
       <<: *pullio
@@ -988,16 +952,16 @@ services:
     <<: *base-misc
     container_name: restic
     environment:
-      B2_ACCOUNT_ID: ${B2_ACCOUNT_ID}
-      B2_ACCOUNT_KEY: ${B2_ACCOUNT_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       BACKUP_CRON: 45 4 */2 * *
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}
       RESTIC_TAG: appdata
-      RESTIC_FORGET_ARGS: --keep-daily 7
+      RESTIC_FORGET_ARGS: --keep-daily 1
       TZ: ${TZ}
-    hostname: restic
-    image: lobaro/restic-backup-docker:latest
+    hostname: restic.internal
+    image: ghcr.io/lobaro/restic-backup-docker:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/lobaro/restic-backup-docker/releases\", \"label\": \"changelog\"}" 
@@ -1010,6 +974,7 @@ services:
     container_name: sabnzbd
     environment:
       <<: *env
+    hostname: sabnzbd.internal
     image: ghcr.io/hotio/sabnzbd:testing
     labels:
       <<: *pullio
@@ -1020,11 +985,12 @@ services:
     volumes:
       - ${CONF_PATH}/sabnzbd:/config
       - /mnt/cache/data:/data
+      - /tmp/sabnzbd:/temp
   slskd:
     <<: *base-default
     container_name: slskd
     depends_on:
-      qbit-movies:
+      vpn-client:
         condition: service_healthy
     environment:
       SLSKD_DOWNLOADS_DIR: '/data/misc/music/soulseek'
@@ -1040,15 +1006,16 @@ services:
       SLSKD_SLSK_NO_DNET: false
       SLSKD_SLSK_DNET_NO_CHILDREN: false
       SLSKD_SLSK_DNET_CHILDREN: 50
-      SLSKD_SLSK_DESCRIPTION: 'slskd https://github.com/slskd/slskd'
+      SLSKD_SLSK_DESCRIPTION: 'slskd https://github.com/slskd/slskd If you queue up more than a few albums at a time you will be banned'
       SLSKD_DISK_LOGGER: false
+    #hostname: slskd.internal
     image: slskd/slskd:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/slskd/slskd/releases\", \"label\": \"changelog\"}"
       org.hotio.pullio.author.avatar: "https://i.ibb.co/HGzzQZ5/soulseek.png"
       net.unraid.docker.icon: "https://i.ibb.co/HGzzQZ5/soulseek.png"
-    network_mode: container:qbit-movies
+    network_mode: container:vpn-client
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/slskd:/app
@@ -1061,6 +1028,7 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+    hostname: sonarr.internal
     image: ghcr.io/hotio/sonarr:nightly
     labels:
       <<: *pullio
@@ -1108,13 +1076,14 @@ services:
             #- hostname: ${URL}
               #service: http://localhost:80
             #- service: http_status:404
+    #hostname: swag.internal
     image: lscr.io/linuxserver/swag:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/nw5w038/swag.png"
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/linuxserver/docker-swag/releases\", \"label\": \"changelog\"}"
       net.unraid.docker.icon: "https://i.ibb.co/nw5w038/swag.png"
-    network_mode: service:wireguard
+    network_mode: container:wireguard
     #networks:
       #- media
       #- misc
@@ -1130,6 +1099,7 @@ services:
     container_name: tautulli
     environment:
       <<: *env
+    hostname: tautulli.internal
     image: ghcr.io/hotio/tautulli:testing
     labels:
       <<: *pullio
@@ -1138,11 +1108,32 @@ services:
       net.unraid.docker.icon: "https://i.ibb.co/4d5DF9m/tautulli.png"
     volumes:
       - ${CONF_PATH}/tautulli:/config
+  trailarr:
+    <<: *base-default
+    container_name: trailarr
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      <<: *env
+      WEBUI_DISABLE_AUTH: True
+    #hostname: trailarr.internal
+    image: nandyalu/trailarr:latest
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/7xzCS0TC/Trailarr.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/nandyalu/trailarr/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/7xzCS0TC/Trailarr.png"
+    network_mode: container:vpn-client
+    volumes:
+      - ${CONF_PATH}/trailarr:/config
+      - ${DATA_PATH}/movies/media:/data/movies/media
+      - ${DATA_PATH}/tv/media:/data/tv/media
   unpackerr:
     <<: *base-media
     container_name: unpackerr
     environment:
       UMASK: 002
+    hostname: unpackerr.internal
     image: ghcr.io/hotio/unpackerr:nightly
     labels:
       <<: *pullio
@@ -1178,6 +1169,7 @@ services:
       INVITATIONS_ALLOWED: true
       ADMIN_TOKEN: ${ADMIN_TOKEN}
       DATABASE_URL: "postgresql://postgres:docker@postgres:5432/vaultwarden"
+    hostname: vaultwarden.internal
     image: vaultwarden/server:latest
     labels:
       <<: *pullio
@@ -1189,6 +1181,50 @@ services:
       #- 4743:80
     volumes:
       - ${CONF_PATH}/vaultwarden:/data
+  vpn-client:
+    <<: *base-media
+    cap_add:
+      - NET_ADMIN
+    container_name: vpn-client
+    environment:
+      <<: *env
+      VPN_ENABLED: "true"
+      VPN_CONF: "wg0"
+      VPN_PROVIDER: "generic"
+      VPN_LAN_NETWORK: "192.168.30.0/24"
+      VPN_LAN_LEAK_ENABLED: "false"
+      VPN_EXPOSE_PORTS_ON_LAN:
+      VPN_AUTO_PORT_FORWARD: "true"
+      VPN_AUTO_PORT_FORWARD_TO_PORTS:
+      VPN_FIREWALL_TYPE: "auto"
+      VPN_NAMESERVERS: "wg"
+      PRIVOXY_ENABLED: "true"
+      #VPN_HEALTHCHECK_ENABLED: true
+      #VPN_IP_CHECK_EXIT: false
+    healthcheck:
+      test: curl --fail https://icanhazip.com || exit 1
+      interval: 15s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+    hostname: vpn-client.internal
+    image: ghcr.io/hotio/base:alpinevpn
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/MxZBnc8t/Alpine.png"
+      net.unraid.docker.icon: "https://i.ibb.co/MxZBnc8t/Alpine.png"
+    ports:
+      - 5030:5030 #soulseek
+      - 7889:7889 #trailarr
+      - 8082:8082 #qbit-tv
+      - 8083:8083 #qbit-movies
+      - 8084:8084 #qbit-misc
+      - 8118:8118 #privoxy
+    sysctls:
+      net.ipv4.conf.all.src_valid_mark: 1
+      net.ipv6.conf.all.disable_ipv6: 1
+    volumes:
+      - ${CONF_PATH}/vpn-client:/config
   webtop:
     <<: *base-misc
     container_name: webtop
@@ -1200,7 +1236,8 @@ services:
       PASSWORD: ${POSTGRES_PASSWORD}
       SUBFOLDER: /
       TITLE: Webtop
-    image: lscr.io/linuxserver/webtop:latest
+    hostname: webtop.internal
+    image: lscr.io/linuxserver/webtop:debian-kde
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/N7f1CRT/webtop.png"
@@ -1236,6 +1273,7 @@ services:
       PERSISTENTKEEPALIVE_PEERS: "all"
       LOG_CONFS: "true"
       #USE_COREDNS: "false"
+    hostname: wireguard.internal
     image: lscr.io/linuxserver/wireguard:latest
     labels:
       org.hotio.pullio.notify: true
