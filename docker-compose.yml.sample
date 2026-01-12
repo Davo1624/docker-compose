@@ -64,26 +64,6 @@ services:
     volumes:
       - ${CONF_PATH}/autobrr:/config
       - ${CONF_PATH}/autobrr/definitions:/definitions
-  autopulse:
-    <<: *base-media
-    container_name: autopulse
-    depends_on:
-      postgres:
-         condition: service_healthy
-    environment:
-      <<: *env
-    hostname: autopulse.internal
-    image: danonline/autopulse:latest-postgres
-    #ports:
-      #- 2875:2875
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/v6VQzjLN/autobrr.jpg"
-      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/dan-online/autopulse/releases\", \"label\": \"changelog\"}"
-      net.unraid.docker.icon: "https://i.ibb.co/v6VQzjLN/autobrr.jpg"
-    volumes:
-      - ${CONF_PATH}/autopulse:/app
-      - ${DATA_PATH}:/data
   barassistant:
     <<: *base-misc
     container_name: barassistant
@@ -155,6 +135,9 @@ services:
       - ${DATA_PATH}/tv/media:/data/tv/media
   beszel-agent:
     <<: *base-default
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
     container_name: beszel-agent
     depends_on:
       wireguard:
@@ -162,13 +145,43 @@ services:
         restart: true
       dockerproxy:
         condition: service_started
+    devices:
+      - /dev/sda:/dev/sda
+      - /dev/sdb:/dev/sdb
+      - /dev/sdc:/dev/sdc
+      - /dev/sdd:/dev/sdd
+      - /dev/sde:/dev/sde
+      - /dev/sdf:/dev/sdf
+      - /dev/sdg:/dev/sdg
+      - /dev/sdh:/dev/sdh
+      - /dev/sdi:/dev/sdi
+      - /dev/sdj:/dev/sdj
+      - /dev/sdk:/dev/sdk
+      - /dev/sdl:/dev/sdl
+      - /dev/sdm:/dev/sdm
+      - /dev/sdn:/dev/sdn
+      - /dev/sdo:/dev/sdo
+      - /dev/sdp:/dev/sdp
+      - /dev/sdq:/dev/sdq
+      - /dev/sdr:/dev/sdr
+      - /dev/sds:/dev/sds
+      - /dev/sdt:/dev/sdt
+      - /dev/sdu:/dev/sdu
+      - /dev/sdv:/dev/sdv
+      - /dev/sdw:/dev/sdw
+      - /dev/sdx:/dev/sdx
+      - /dev/sdy:/dev/sdy
+      - /dev/sdz:/dev/sdz
+      - /dev/nvme0n1:/dev/nvme0n1
+      - /dev/nvme1n1:/dev/nvme2n1
+      - /dev/nvme2n1:/dev/nvme3n1
     environment:
       <<: *env
       DOCKER_HOST: "tcp://dockerproxy:2375"
       PORT: 45876
       KEY: ${BESZEL_AGENT}
     #hostname: beszel-agent.internal
-    image: henrygd/beszel-agent:latest
+    image: henrygd/beszel-agent:alpine
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/6gbNTWG/bazarr.png"
@@ -237,48 +250,6 @@ services:
     user: ${PUID}:${PGID}
     #volumes:
       #- /var/run/docker.sock:/var/run/docker.sock
-  cross-seed-movies:
-    <<: *base-media
-    command: daemon
-    container_name: cross-seed-movies
-    depends_on:
-      - qbit-movies
-      - prowlarr
-    hostname: cross-seed-movies.internal
-    environment:
-      TZ: ${TZ}
-    image: crossseed/cross-seed:latest
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
-      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
-      net.unraid.docker.icon: "https://i.ibb.co/Ptyx6sC/crossseed.png"
-    user: ${PUID}:${PGID}
-    volumes:
-      - ${CONF_PATH}/cross-seed-movies:/config
-      - ${DATA_PATH}/movies:/data/movies
-      - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
-  cross-seed-tv:
-    <<: *base-media
-    command: daemon
-    container_name: cross-seed-tv
-    depends_on:
-      - qbit-tv
-      - prowlarr
-    hostname: cross-seed-tv.internal
-    environment:
-      TZ: ${TZ}
-    image: crossseed/cross-seed:latest
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/Ptyx6sC/crossseed.png"
-      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/mmgoodnow/cross-seed/releases\", \"label\": \"changelog\"}"
-      net.unraid.docker.icon: "https://i.ibb.co/Ptyx6sC/crossseed.png"
-    user: ${PUID}:${PGID}
-    volumes:
-      - ${CONF_PATH}/cross-seed-tv:/config
-      - ${DATA_PATH}/tv:/data/tv
-      - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
   dockerproxy:
     <<: *base-misc
     container_name: dockerproxy
@@ -310,7 +281,7 @@ services:
       <<: *env
       DOCKER_HOST: "tcp://dockerproxy:2375"
       DOZZLE_HOSTNAME: unraid
-      DOZZLE_REMOTE_AGENT: 192.168.30.3:7007,10.0.20.2:7007
+      DOZZLE_REMOTE_AGENT: 192.168.30.3:7007,10.0.20.1:7007
       #DOZZLE_REMOTE_HOST: "tcp://10.0.20.2:2375"
     image: amir20/dozzle:latest
     labels:
@@ -349,22 +320,19 @@ services:
       - ${CONF_PATH}/jellyseerr/logs:/remotelogs/jellyseerr:ro
       - ${CONF_PATH}/swag/geoip2db:/config/geoip2db
       - ${CONF_PATH}/swag/log/nginx:/remotelogs/nginx:ro
+      - ${CONF_PATH}/swag/nginx/blocklist.conf:/config/fail2ban/blocklist.conf:z
       - ${CONF_PATH}/vaultwarden:/remotelogs/vaultwarden:ro
       - ${CONF_PATH}/webtop/logs/nginx:/remotelogs/webtop:ro
       - /var/log:/remotelogs/unraid:ro
   immich-server:
     <<: *base-misc
     container_name: immich_server
-    hostname: immich-server.internal
-    image: ghcr.io/immich-app/immich-server:release
-    # extends:
-    #   file: hwaccel.transcoding.yml
-    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
-    restart: unless-stopped
-    volumes:
-      - ${DATA_PATH}/photos/immich:/usr/src/app/upload
-      - ${CONF_PATH}/immich/server/thumbs:/usr/src/app/upload/thumbs
-      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - redis
+      - immich-postgres
+    devices:
+      - /dev/dri/card1:/dev/dri/card1
+      - /dev/dri/renderD128:/dev/dri/renderD128
     environment:
       <<: *env
       DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -375,24 +343,32 @@ services:
       MACHINE_LEARNING_WORKERS: 2
       MACHINE_LEARNING_WORKER_TIMEOUT: 120
       DB_DATABASE_NAME: immich
+    healthcheck:
+      disable: false
+    hostname: immich-server.internal
+    image: ghcr.io/immich-app/immich-server:release
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Rzdj77F/immich.png"
       net.unraid.docker.icon: "https://i.ibb.co/Rzdj77F/immich.png"
+    # extends:
+    #   file: hwaccel.transcoding.yml
+    #   service: cpu # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
     #ports:
       #- 2283:2283
-    depends_on:
-      - redis
-      - immich-postgres
-    healthcheck:
-      disable: false
+    restart: unless-stopped
+    volumes:
+      - ${DATA_PATH}/photos/immich:/usr/src/app/upload
+      - ${CONF_PATH}/immich/server/thumbs:/usr/src/app/upload/thumbs
+      - /etc/localtime:/etc/localtime:ro
   immich-machine-learning:
     <<: *base-misc
     container_name: immich_machine_learning
     device_cgroup_rules:
       - 'c 189:* rmw'
     devices:
-      - /dev/dri:/dev/dri
+      - /dev/dri/card1:/dev/dri/card1
+      - /dev/dri/renderD128:/dev/dri/renderD128
     hostname: immich-machine-learning.internal
     image: ghcr.io/immich-app/immich-machine-learning:release-openvino
     # extends:
@@ -439,7 +415,7 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASS: ${POSTGRES_PASSWORD}
     hostname: jellyseerr.internal
-    image: ghcr.io/hotio/jellyseerr
+    image: ghcr.io/hotio/seerr:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/fallenbagel/jellyseerr/releases\", \"label\": \"changelog\"}"
@@ -459,9 +435,9 @@ services:
         condition: service_healthy
     environment:
       <<: *env
-    #image: ghcr.io/hotio/lidarr:nightly
     hostname: lidarr.internal
     image: ghcr.io/hotio/lidarr:pr-plugins
+    #image: ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4735
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/nQrWPpB/lidarr.png"
@@ -486,9 +462,9 @@ services:
       ONLINE_MODE: true
       LEVEL_TYPE: default
       ENFORCE_WHITELIST: true
-      WHITE_LIST_USERS: "dav01624"
+      WHITE_LIST_USERS: ""
       SERVER_PORT: 19132
-      OPS: ""
+      OPS: "2535411681598661"
     hostname: minecraft.internal
     image: itzg/minecraft-bedrock-server
     labels:
@@ -501,42 +477,35 @@ services:
     restart: unless-stopped
     volumes:
       - ${CONF_PATH}/minecraft:/data
+  netronome:
+    <<: *base-misc
+    container_name: netronome
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *env
+      NETRONOME__DB_TYPE: ${POSTGRES_DB}
+      NETRONOME__DB_HOST: ${POSTGRES_HOST}
+      NETRONOME__DB_PORT: 5432
+      NETRONOME__DB_USER: ${POSTGRES_USER}
+      NETRONOME__DB_PASSWORD: ${POSTGRES_PASSWORD}
+      NETRONOME__DB_NAME: netronome
+      NETRONOME__DB_SSLMODE: disable
+    hostname: netronome.internal
+    image: ghcr.io/autobrr/netronome:latest
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/DgfVT4cr/netronome.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/autobrr/netronome/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/DgfVT4cr/netronome.png"
+    #ports:
+      #- "7575:7575"
+    volumes:
+      - ${CONF_PATH}/netronome:/data/.config/netronome
   notifiarr:
     <<: *base-media
-    cap_add:
-      - SYS_RAWIO
-      - SYS_ADMIN
     container_name: notifiarr
-    devices:
-      - /dev/sda:/dev/sda
-      - /dev/sdb:/dev/sdb
-      - /dev/sdc:/dev/sdc
-      - /dev/sdd:/dev/sdd
-      - /dev/sde:/dev/sde
-      - /dev/sdf:/dev/sdf
-      - /dev/sdg:/dev/sdg
-      - /dev/sdh:/dev/sdh
-      - /dev/sdi:/dev/sdi
-      - /dev/sdj:/dev/sdj
-      - /dev/sdk:/dev/sdk
-      - /dev/sdl:/dev/sdl
-      - /dev/sdm:/dev/sdm
-      - /dev/sdn:/dev/sdn
-      - /dev/sdo:/dev/sdo
-      - /dev/sdp:/dev/sdp
-      - /dev/sdq:/dev/sdq
-      - /dev/sdr:/dev/sdr
-      - /dev/sds:/dev/sds
-      - /dev/sdt:/dev/sdt
-      - /dev/sdu:/dev/sdu
-      - /dev/sdv:/dev/sdv
-      - /dev/sdw:/dev/sdw
-      - /dev/sdx:/dev/sdx
-      - /dev/sdy:/dev/sdy
-      - /dev/sdz:/dev/sdz
-      - /dev/nvme0n1:/dev/nvme0n1
-      - /dev/nvme1n1:/dev/nvme1n1
-      - /dev/nvme2n1:/dev/nvme2n1
     environment:
       TZ: ${TZ}
     hostname: davo1624
@@ -608,7 +577,7 @@ services:
       - /dev/dri:/dev/dri
     environment:
       <<: *env
-      #- PLEX_CLAIM_TOKEN=${PLEX_CLAIM}
+      #PLEX_CLAIM_TOKEN: ${PLEX_CLAIM_TOKEN}
       PLEX_NO_AUTH_NETWORKS: ${ALLOWED_NETWORKS}
       PLEX_ADVERTISE_URL: ${ADVERTISE_IP}
       PLEX_BETA_INSTALL: true
@@ -634,7 +603,6 @@ services:
     #runtime: nvidia
     volumes:
       - ${CONF_PATH}/plex:/config
-      - ${CONF_PATH}/swag/etc:/swag-ssl:ro
       - ${DATA_PATH}/movies/media:/data/movies/media
       - ${DATA_PATH}/tv/media:/data/tv/media
       - ${DATA_PATH}/misc/music/media:/data/misc/music/media
@@ -682,6 +650,10 @@ services:
       org.hotio.pullio.author.avatar: "https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/meisnate12/Plex-Meta-Manager/releases\", \"label\": \"changelog\"}"
       net.unraid.docker.icon: "https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/pmm:/config
@@ -721,10 +693,10 @@ services:
     hostname: postgres.internal
     image: pgautoupgrade/pgautoupgrade:latest
     labels:
-      <<: *pullio
-      org.hotio.pullio.update: false #prevent auto-update
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/NCgNfC8/pgadmin.png"
-      org.hotio.pullio.author.url: "{\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
+      #<<: *pullio
+      #org.hotio.pullio.update: false #prevent auto-update
+      #org.hotio.pullio.author.avatar: "https://i.ibb.co/NCgNfC8/pgadmin.png"
+      #org.hotio.pullio.author.url: "{\"link\": \"https://www.postgresql.org/docs/release/\", \"label\": \"changelog\"}"
       net.unraid.docker.icon: "https://i.ibb.co/NCgNfC8/pgadmin.png"
     networks:
       - misc
@@ -750,7 +722,7 @@ services:
     restart: no
     volumes:
       - ${CONF_PATH}/scripts/upgradinatorr:/scripts
-    command: "pwsh /scripts/upgradinatorr.ps1 -apps Radarr -verbose"
+    command: "pwsh /scripts/upgradinatorr.ps1 -apps Radarr4k -verbose"
   prowlarr:
     <<: *base-media
     container_name: prowlarr
@@ -767,51 +739,19 @@ services:
       net.unraid.docker.icon: "https://notifiarr.com/images/logo/prowlarr.png"
     volumes:
       - ${CONF_PATH}/prowlarr:/config
-  qbit-manage:
-    <<: *base-media
-    container_name: qbit-manage
-    environment:
-      <<: *env
-      QBT_SCHEDULE: 60
-      QBT_STARTUP_DELAY: 30
-      QBT_CONFIG: config_*.yml
-      QBT_LOGFILE: /config/logs/qbitmanage.log
-      #QBT_TRACE: true
-    hostname: qbit-manage.internal
-    image: ghcr.io/hotio/qbitmanage:nightly
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/w74ZSL5/qbitmanage.png"
-      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/StuffAnThings/qbit_manage/releases\", \"label\": \"changelog\"}"
-      net.unraid.docker.icon: "https://i.ibb.co/w74ZSL5/qbitmanage.png"
-    volumes:
-      - ${CONF_PATH}/qbm:/config
-      - ${CONF_PATH}/qbit-misc/data/BT_backup:/torrents-misc
-      - ${CONF_PATH}/qbit-movies/data/BT_backup:/torrents-movies
-      - ${CONF_PATH}/qbit-tv/data/BT_backup:/torrents-tv
-      - ${DATA_PATH}/movies/torrents:/data/movies/torrents
-      - ${DATA_PATH}/tv/torrents:/data/tv/torrents
-      - ${DATA_PATH}/misc/torrents:/data/misc/torrents
   qbit-movies:
     <<: *base-default
-    cap_add:
-      - NET_ADMIN
     container_name: qbit-movies
     depends_on:
       vpn-client:
         condition: service_healthy
     environment:
       <<: *env
+      LIBTORRENT: "v2"
       VPN_ENABLED: false
       WEBUI_PORTS: "8083/tcp"
-    healthcheck:
-      test: curl --fail https://icanhazip.com || exit 1
-      interval: 15s
-      retries: 5
-      start_period: 20s
-      timeout: 10s
     #hostname: qbit-movies.internal
-    image: docker.io/hotio/qbittorrent:release-5.0.4
+    image: ghcr.io/hotio/qbittorrent:release-5.1.2
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
@@ -828,16 +768,11 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+      LIBTORRENT: "v2"
       VPN_ENABLED: false
       WEBUI_PORTS: "8084/tcp"
-    healthcheck:
-      test: curl --fail https://icanhazip.com || exit 1
-      interval: 15s
-      retries: 5
-      start_period: 20s
-      timeout: 10s
     #hostname: qbit-misc.internal
-    image: docker.io/hotio/qbittorrent:release-5.0.4
+    image: ghcr.io/hotio/qbittorrent:release-5.1.2
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
@@ -854,16 +789,11 @@ services:
         condition: service_healthy
     environment:
       <<: *env
+      LIBTORRENT: "v2"
       VPN_ENABLED: false
       WEBUI_PORTS: "8082/tcp"
-    healthcheck:
-      test: curl --fail https://icanhazip.com || exit 1
-      interval: 15s
-      retries: 5
-      start_period: 20s
-      timeout: 10s
     #hostname: qbit-tv.internal
-    image: docker.io/hotio/qbittorrent:release-5.0.4
+    image: ghcr.io/hotio/qbittorrent:release-5.1.2
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/Tq7Tcz8/qbittorrent.png"
@@ -872,6 +802,25 @@ services:
     volumes:
       - ${CONF_PATH}/qbit-tv:/config
       - ${DATA_PATH}/tv/torrents:/data/tv/torrents
+  qui:
+    <<: *base-media
+    container_name: qui
+    environment:
+      <<: *env
+    hostname: qui.internal
+    image: ghcr.io/hotio/qui:latest
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/dJLqmT4z/qui.png"
+      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/autobrr/qui/releases\", \"label\": \"changelog\"}"
+      net.unraid.docker.icon: "https://i.ibb.co/dJLqmT4z/qui.png"
+    #ports:
+      #8080:8080
+    volumes:
+      - ${CONF_PATH}/qui:/config
+      - ${DATA_PATH}/misc:/data/misc
+      - ${DATA_PATH}/movies:/data/movies
+      - ${DATA_PATH}/tv:/data/tv
   radarr:
     <<: *base-media
     container_name: radarr
@@ -958,7 +907,7 @@ services:
       RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}
       RESTIC_PASSWORD: ${RESTIC_PASSWORD}
       RESTIC_TAG: appdata
-      RESTIC_FORGET_ARGS: --keep-daily 1
+      RESTIC_FORGET_ARGS: --prune --keep-last 1
       TZ: ${TZ}
     hostname: restic.internal
     image: ghcr.io/lobaro/restic-backup-docker:latest
@@ -986,6 +935,23 @@ services:
       - ${CONF_PATH}/sabnzbd:/config
       - /mnt/cache/data:/data
       - /tmp/sabnzbd:/temp
+  seasonpackarr:
+    <<: *base-media
+    container_name: seasonpackarr
+    environment:
+      SEASONPACKARR_CONFIG_PATH: /config
+    image: ghcr.io/nuxencs/seasonpackarr
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/GV9V7NY/seasonpackarr.png"
+      net.unraid.docker.icon: "https://i.ibb.co/GV9V7NY/seasonpackarr.png"
+    #ports:
+      #- 42069:42069
+    restart: unless-stopped
+    user: ${PUID}:${PGID}
+    volumes:
+      - ${CONF_PATH}/seasonpackarr:/config
+      - ${DATA_PATH}/tv/torrents:/data/tv/torrents
   slskd:
     <<: *base-default
     container_name: slskd
@@ -993,6 +959,7 @@ services:
       vpn-client:
         condition: service_healthy
     environment:
+      <<: *env
       SLSKD_DOWNLOADS_DIR: '/data/misc/music/soulseek'
       SLSKD_INCOMPLETE_DIR: '/data/misc/music/soulseek/.incomplete'
       SLSKD_SHARED_DIR: '/data/misc/music/media;/data/misc/music/media-unsorted'
@@ -1008,17 +975,18 @@ services:
       SLSKD_SLSK_DNET_CHILDREN: 50
       SLSKD_SLSK_DESCRIPTION: 'slskd https://github.com/slskd/slskd If you queue up more than a few albums at a time you will be banned'
       SLSKD_DISK_LOGGER: false
+      SLSKD_SHARE_CACHE_STORAGE_MODE: 'disk'
+      SLSKD_SHARE_CACHE_RETENTION: 10080
     #hostname: slskd.internal
-    image: slskd/slskd:latest
+    image: ghcr.io/hotio/slskd:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.url: "{\"link\": \"https://github.com/slskd/slskd/releases\", \"label\": \"changelog\"}"
       org.hotio.pullio.author.avatar: "https://i.ibb.co/HGzzQZ5/soulseek.png"
       net.unraid.docker.icon: "https://i.ibb.co/HGzzQZ5/soulseek.png"
     network_mode: container:vpn-client
-    user: ${PUID}:${PGID}
     volumes:
-      - ${CONF_PATH}/slskd:/app
+      - ${CONF_PATH}/slskd:/config
       - ${DATA_PATH}/misc/music:/data/misc/music
   sonarr:
     <<: *base-media
@@ -1108,26 +1076,6 @@ services:
       net.unraid.docker.icon: "https://i.ibb.co/4d5DF9m/tautulli.png"
     volumes:
       - ${CONF_PATH}/tautulli:/config
-  trailarr:
-    <<: *base-default
-    container_name: trailarr
-    devices:
-      - /dev/dri:/dev/dri
-    environment:
-      <<: *env
-      WEBUI_DISABLE_AUTH: True
-    #hostname: trailarr.internal
-    image: nandyalu/trailarr:latest
-    labels:
-      <<: *pullio
-      org.hotio.pullio.author.avatar: "https://i.ibb.co/7xzCS0TC/Trailarr.png"
-      org.hotio.pullio.author.url: "{\"link\": \"https://github.com/nandyalu/trailarr/releases\", \"label\": \"changelog\"}"
-      net.unraid.docker.icon: "https://i.ibb.co/7xzCS0TC/Trailarr.png"
-    network_mode: container:vpn-client
-    volumes:
-      - ${CONF_PATH}/trailarr:/config
-      - ${DATA_PATH}/movies/media:/data/movies/media
-      - ${DATA_PATH}/tv/media:/data/tv/media
   unpackerr:
     <<: *base-media
     container_name: unpackerr
@@ -1168,7 +1116,7 @@ services:
       SIGNUPS_VERIFY: true
       INVITATIONS_ALLOWED: true
       ADMIN_TOKEN: ${ADMIN_TOKEN}
-      DATABASE_URL: "postgresql://postgres:docker@postgres:5432/vaultwarden"
+      DATABASE_URL: "postgresql://postgres:password@postgres:5432/vaultwarden"
     hostname: vaultwarden.internal
     image: vaultwarden/server:latest
     labels:
@@ -1194,11 +1142,13 @@ services:
       VPN_LAN_NETWORK: "192.168.30.0/24"
       VPN_LAN_LEAK_ENABLED: "false"
       VPN_EXPOSE_PORTS_ON_LAN:
-      VPN_AUTO_PORT_FORWARD: "true"
-      VPN_AUTO_PORT_FORWARD_TO_PORTS:
-      VPN_FIREWALL_TYPE: "auto"
+      VPN_AUTO_PORT_FORWARD: "false"
+      VPN_PORT_REDIRECTS: 21499@21499/tcp,21500@21500/tcp,21501@21501/tcp,50300@50300/tcp
+      VPN_HEALTHCHECK_ENABLED: "false"
       VPN_NAMESERVERS: "wg"
       PRIVOXY_ENABLED: "true"
+      UNBOUND_ENABLED: "false"
+      UNBOUND_NAMESERVERS: "false"
       #VPN_HEALTHCHECK_ENABLED: true
       #VPN_IP_CHECK_EXIT: false
     healthcheck:
@@ -1214,15 +1164,11 @@ services:
       org.hotio.pullio.author.avatar: "https://i.ibb.co/MxZBnc8t/Alpine.png"
       net.unraid.docker.icon: "https://i.ibb.co/MxZBnc8t/Alpine.png"
     ports:
-      - 5030:5030 #soulseek
-      - 7889:7889 #trailarr
-      - 8082:8082 #qbit-tv
-      - 8083:8083 #qbit-movies
-      - 8084:8084 #qbit-misc
+      #- 5030:5030 #soulseek
+      #- 8082:8082 #qbit-tv
+      #- 8083:8083 #qbit-movies
+      #- 8084:8084 #qbit-misc
       - 8118:8118 #privoxy
-    sysctls:
-      net.ipv4.conf.all.src_valid_mark: 1
-      net.ipv6.conf.all.disable_ipv6: 1
     volumes:
       - ${CONF_PATH}/vpn-client:/config
   webtop:
@@ -1236,8 +1182,10 @@ services:
       PASSWORD: ${POSTGRES_PASSWORD}
       SUBFOLDER: /
       TITLE: Webtop
+      #DRI_NODE: /dev/dri/renderD128
     hostname: webtop.internal
-    image: lscr.io/linuxserver/webtop:debian-kde
+    #image: lscr.io/linuxserver/webtop:ubuntu-xfce
+    image: lscr.io/linuxserver/webtop:ubuntu-xfce-3593fa1e-ls235
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/N7f1CRT/webtop.png"
@@ -1255,24 +1203,16 @@ services:
     <<: *base-default
     cap_add:
       - NET_ADMIN
+      - SYS_MODULE
     container_name: wireguard
     healthcheck:
-      test: ["CMD-SHELL", "ping -c 1 10.0.20.2 | grep '1 received'"]
+      test: ["CMD-SHELL", "ping -c 1 10.0.20.1 | grep '1 received'"]
       interval: 10s
       retries: 5
       start_period: 10s
       timeout: 5s
     environment:
       <<: *env
-      SERVERURL: ${WIREGUARD_URL}
-      SERVERPORT: 51821
-      PEERS: 2
-      PEERDNS: "auto"
-      INTERNAL_SUBNET: 10.0.20.0
-      ALLOWEDIPS: 10.0.20.0/24
-      PERSISTENTKEEPALIVE_PEERS: "all"
-      LOG_CONFS: "true"
-      #USE_COREDNS: "false"
     hostname: wireguard.internal
     image: lscr.io/linuxserver/wireguard:latest
     labels:
@@ -1295,8 +1235,6 @@ services:
       #- 45876:45876 #beszel-agent
       #- 45877:45877 #beszel-agent-racknerd
     restart: unless-stopped
-    sysctls:
-      - net.ipv4.conf.all.src_valid_mark=1
     volumes:
       - ${CONF_PATH}/wireguard:/config
       - /lib/modules:/lib/modules
