@@ -390,7 +390,7 @@ services:
     <<: *base-misc
     container_name: immich_postgres
     hostname: immich-postgres.internal
-    image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.3.0
     environment:
       <<: *env
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -436,7 +436,7 @@ services:
     environment:
       <<: *env
     hostname: lidarr.internal
-    image: ghcr.io/hotio/lidarr:pr-plugins
+    image: ghcr.io/hotio/lidarr:nightly
     #image: ghcr.io/hotio/lidarr:pr-plugins-2.14.1.4735
     labels:
       <<: *pullio
@@ -464,7 +464,7 @@ services:
       ENFORCE_WHITELIST: true
       WHITE_LIST_USERS: ""
       SERVER_PORT: 19132
-      OPS: "2535411681598661"
+      OPS: ""
     hostname: minecraft.internal
     image: itzg/minecraft-bedrock-server
     labels:
@@ -552,7 +552,7 @@ services:
     environment:
       BACKUP_DIR: /backups
       POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_DB: "authelia autobrr autopulse jellyseerr lidarr-main prowlarr-main radarr-main radarr-4k-main readarr-main sonarr-main vaultwarden"
+      POSTGRES_DB: "authelia autobrr lidarr-main netronome prowlarr-main qui radarr-main radarr-4k-main readarr-main seerr sonarr-main spoolman vaultwarden"
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       SCHEDULE: "@daily"
@@ -569,7 +569,7 @@ services:
     user: postgres:postgres
     volumes:
       - /mnt/backups/appdata/postgres:/backups
-      - ${CONF_PATH}/pgbackups:/var/lib/postgresql/data
+      #- ${CONF_PATH}/pgbackups:/var/lib/postgresql/data
   plex:
     <<: *base-default
     container_name: plex
@@ -644,7 +644,7 @@ services:
       PMM_WIDTH: 200
       TZ: ${TZ}
     hostname: plex-meta-manager.internal
-    image: kometateam/kometa:nightly
+    image: kometateam/kometa:latest
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/VDnX2MT/plex-meta-manager.png"
@@ -805,10 +805,16 @@ services:
   qui:
     <<: *base-media
     container_name: qui
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       <<: *env
+      QUI__DATABASE_ENGINE: postgres
+      QUI__DATABASE_DSN: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/qui?sslmode=disable
     hostname: qui.internal
-    image: ghcr.io/hotio/qui:latest
+    #image: ghcr.io/autobrr/qui:pr-1581
+    image: ghcr.io/autobrr/qui:develop
     labels:
       <<: *pullio
       org.hotio.pullio.author.avatar: "https://i.ibb.co/dJLqmT4z/qui.png"
@@ -816,9 +822,10 @@ services:
       net.unraid.docker.icon: "https://i.ibb.co/dJLqmT4z/qui.png"
     #ports:
       #8080:8080
+    user: ${PUID}:${PGID}
     volumes:
       - ${CONF_PATH}/qui:/config
-      - ${DATA_PATH}/misc:/data/misc
+      - ${DATA_PATH}/misc/torrents:/data/misc/torrents
       - ${DATA_PATH}/movies:/data/movies
       - ${DATA_PATH}/tv:/data/tv
   radarr:
@@ -975,8 +982,9 @@ services:
       SLSKD_SLSK_DNET_CHILDREN: 50
       SLSKD_SLSK_DESCRIPTION: 'slskd https://github.com/slskd/slskd If you queue up more than a few albums at a time you will be banned'
       SLSKD_DISK_LOGGER: false
-      SLSKD_SHARE_CACHE_STORAGE_MODE: 'disk'
-      SLSKD_SHARE_CACHE_RETENTION: 10080
+      SLSKD_SHARE_CACHE_STORAGE_MODE: 'memory'
+      SLSKD_SHARE_CACHE_WORKERS: 4
+      SLSKD_SHARE_CACHE_RETENTION: 2880
     #hostname: slskd.internal
     image: ghcr.io/hotio/slskd:latest
     labels:
@@ -1007,6 +1015,26 @@ services:
     volumes:
       - ${CONF_PATH}/sonarr:/config
       - ${DATA_PATH}/tv:/data/tv
+  spoolman:
+    <<: *base-misc
+    container_name: spoolman
+    environment:
+      <<: *env
+      SPOOLMAN_DB_TYPE: ${POSTGRES_DB}
+      SPOOLMAN_DB_HOST: ${POSTGRES_HOST}
+      SPOOLMAN_DB_PORT: 5432
+      SPOOLMAN_DB_NAME: spoolman
+      SPOOLMAN_DB_USERNAME: ${POSTGRES_USER}
+      SPOOLMAN_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    hostname: spoolman.internal
+    image: ghcr.io/donkie/spoolman:latest
+    labels:
+      <<: *pullio
+      org.hotio.pullio.author.avatar: "https://i.ibb.co/sdQq7w1r/images.png"
+      org.hotio.pullio.author.url: "https://github.com/Donkie/Spoolman/releases"
+      net.unraid.docker.icon: "https://i.ibb.co/sdQq7w1r/images.png"
+    volumes:
+      - ${CONF_PATH}/spoolman:/home/app/.local/share/spoolman
   swag:
     <<: *base-default
     cap_add:
@@ -1116,7 +1144,7 @@ services:
       SIGNUPS_VERIFY: true
       INVITATIONS_ALLOWED: true
       ADMIN_TOKEN: ${ADMIN_TOKEN}
-      DATABASE_URL: "postgresql://postgres:password@postgres:5432/vaultwarden"
+      DATABASE_URL: "postgresql://postgres:docker@postgres:5432/vaultwarden"
     hostname: vaultwarden.internal
     image: vaultwarden/server:latest
     labels:
